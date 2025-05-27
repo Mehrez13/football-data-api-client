@@ -1,0 +1,53 @@
+{
+  "name": "football-data-api-client",
+  "version": "1.0.0",
+  "description": "Interface web pour interroger l'API Football-Data.org avec filtres personnalisés et téléchargement automatique des résultats",
+  "main": "index.html",
+  "scripts": {
+    "start": "python -m http.server 8000",
+    "serve": "npx http-server . -p 8000 -o",
+    "test": "echo \"Ouvrir tests/test_examples.html pour les tests manuels\" && exit 0",
+    "lint": "echo \"Pas de linter configuré pour le moment\" && exit 0",
+    "build": "echo \"Pas de build nécessaire - HTML statique\" && exit 0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Mehrez13/football-data-api-client.git"
+  },
+  "keywords": [
+    "football",
+    "soccer",
+    "api",
+    "client",
+    "premier-league",
+    "champions-league",
+    "bundesliga",
+    "la-liga",
+    "serie-a",
+    "ligue-1",
+    "football-data",
+    "sports",
+    "web-app",
+    "javascript",
+    "html",
+    "css"
+  ],
+  "author": "Mehrez13",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Mehrez13/football-data-api-client/issues"
+  },
+  "homepage": "https://github.com/Mehrez13/football-data-api-client#readme",
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  },
+  "engines": {
+    "node": ">=12.0.0"
+  },
+  "browserslist": [
+    "> 1%",
+    "last 2 versions",
+    "not dead",
+    "not ie 11"
+  ]
+}

@@ -1,0 +1,109 @@
+{
+  "count": 10,
+  "filters": {
+    "limit": 10,
+    "season": "2024"
+  },
+  "competition": {
+    "id": 2021,
+    "name": "Premier League",
+    "code": "PL",
+    "type": "LEAGUE",
+    "emblem": "https://crests.football-data.org/PL.png"
+  },
+  "season": {
+    "id": 1564,
+    "startDate": "2024-08-16",
+    "endDate": "2025-05-25",
+    "currentMatchday": 16
+  },
+  "scorers": [
+    {
+      "player": {
+        "id": 3859,
+        "name": "Mohamed Salah",
+        "firstName": "Mohamed",
+        "lastName": "Salah",
+        "dateOfBirth": "1992-06-15",
+        "nationality": "Egypt",
+        "position": "Right Winger",
+        "shirtNumber": 11,
+        "lastUpdated": "2024-12-15T02:51:37Z"
+      },
+      "team": {
+        "id": 64,
+        "name": "Liverpool FC",
+        "shortName": "Liverpool",
+        "tla": "LIV",
+        "crest": "https://crests.football-data.org/64.png",
+        "address": "Anfield Road Liverpool L4 OTH",
+        "website": "http://www.liverpoolfc.tv",
+        "founded": 1892,
+        "clubColors": "Red / Red",
+        "venue": "Anfield",
+        "lastUpdated": "2024-02-10T19:54:29Z"
+      },
+      "goals": 17,
+      "assists": 13,
+      "penalties": 3
+    },
+    {
+      "player": {
+        "id": 5678,
+        "name": "Erling Haaland",
+        "firstName": "Erling",
+        "lastName": "Haaland",
+        "dateOfBirth": "2000-07-21",
+        "nationality": "Norway",
+        "position": "Centre-Forward",
+        "shirtNumber": 9,
+        "lastUpdated": "2024-12-15T02:51:37Z"
+      },
+      "team": {
+        "id": 65,
+        "name": "Manchester City FC",
+        "shortName": "Man City",
+        "tla": "MCI",
+        "crest": "https://crests.football-data.org/65.png",
+        "address": "SportCity Manchester M11 3FF",
+        "website": "https://www.mancity.com",
+        "founded": 1880,
+        "clubColors": "Sky Blue / White",
+        "venue": "Etihad Stadium",
+        "lastUpdated": "2024-02-10T19:54:29Z"
+      },
+      "goals": 15,
+      "assists": 1,
+      "penalties": 2
+    },
+    {
+      "player": {
+        "id": 9012,
+        "name": "Cole Palmer",
+        "firstName": "Cole",
+        "lastName": "Palmer",
+        "dateOfBirth": "2002-05-06",
+        "nationality": "England",
+        "position": "Attacking Midfield",
+        "shirtNumber": 20,
+        "lastUpdated": "2024-12-15T02:51:37Z"
+      },
+      "team": {
+        "id": 61,
+        "name": "Chelsea FC",
+        "shortName": "Chelsea",
+        "tla": "CHE",
+        "crest": "https://crests.football-data.org/61.png",
+        "address": "Fulham Road London SW6 1HS",
+        "website": "http://www.chelseafc.com",
+        "founded": 1905,
+        "clubColors": "Royal Blue / White",
+        "venue": "Stamford Bridge",
+        "lastUpdated": "2024-02-10T19:54:29Z"
+      },
+      "goals": 12,
+      "assists": 6,
+      "penalties": 5
+    }
+  ]
+}

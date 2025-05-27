@@ -1,0 +1,126 @@
+{
+  "count": 15,
+  "filters": {
+    "dateFrom": "2024-12-01",
+    "dateTo": "2024-12-31",
+    "status": "SCHEDULED"
+  },
+  "matches": [
+    {
+      "area": {
+        "id": 2072,
+        "name": "England",
+        "code": "ENG",
+        "flag": "https://crests.football-data.org/england.png"
+      },
+      "competition": {
+        "id": 2021,
+        "name": "Premier League",
+        "code": "PL",
+        "type": "LEAGUE",
+        "emblem": "https://crests.football-data.org/PL.png"
+      },
+      "season": {
+        "id": 1564,
+        "startDate": "2024-08-16",
+        "endDate": "2025-05-25",
+        "currentMatchday": 17
+      },
+      "id": 456790,
+      "utcDate": "2024-12-22T16:30:00Z",
+      "status": "SCHEDULED",
+      "matchday": 17,
+      "stage": "REGULAR_SEASON",
+      "group": null,
+      "lastUpdated": "2024-12-15T10:22:15Z",
+      "homeTeam": {
+        "id": 64,
+        "name": "Liverpool FC",
+        "shortName": "Liverpool",
+        "tla": "LIV",
+        "crest": "https://crests.football-data.org/64.png"
+      },
+      "awayTeam": {
+        "id": 76,
+        "name": "Tottenham Hotspur FC",
+        "shortName": "Tottenham",
+        "tla": "TOT",
+        "crest": "https://crests.football-data.org/76.png"
+      },
+      "score": {
+        "winner": null,
+        "duration": "REGULAR",
+        "fullTime": {
+          "home": null,
+          "away": null
+        },
+        "halfTime": {
+          "home": null,
+          "away": null
+        }
+      },
+      "odds": {
+        "msg": "Activate Odds-Package in User-Panel to retrieve odds."
+      },
+      "referees": []
+    },
+    {
+      "area": {
+        "id": 2072,
+        "name": "England",
+        "code": "ENG",
+        "flag": "https://crests.football-data.org/england.png"
+      },
+      "competition": {
+        "id": 2021,
+        "name": "Premier League",
+        "code": "PL",
+        "type": "LEAGUE",
+        "emblem": "https://crests.football-data.org/PL.png"
+      },
+      "season": {
+        "id": 1564,
+        "startDate": "2024-08-16",
+        "endDate": "2025-05-25",
+        "currentMatchday": 18
+      },
+      "id": 456791,
+      "utcDate": "2024-12-26T15:00:00Z",
+      "status": "SCHEDULED",
+      "matchday": 18,
+      "stage": "REGULAR_SEASON",
+      "group": null,
+      "lastUpdated": "2024-12-15T10:22:15Z",
+      "homeTeam": {
+        "id": 1044,
+        "name": "Leicester City FC",
+        "shortName": "Leicester",
+        "tla": "LEI",
+        "crest": "https://crests.football-data.org/1044.png"
+      },
+      "awayTeam": {
+        "id": 64,
+        "name": "Liverpool FC",
+        "shortName": "Liverpool",
+        "tla": "LIV",
+        "crest": "https://crests.football-data.org/64.png"
+      },
+      "score": {
+        "winner": null,
+        "duration": "REGULAR",
+        "fullTime": {
+          "home": null,
+          "away": null
+        },
+        "halfTime": {
+          "home": null,
+          "away": null
+        }
+      },
+      "odds": {
+        "msg": "Activate Odds-Package in User-Panel to retrieve odds."
+      },
+      "referees": []
+    }
+  ]
+}
