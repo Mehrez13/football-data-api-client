@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Football Data API Client</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(45deg, #2c3e50, #34495e);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .config-section {
+            padding: 30px;
+            border-bottom: 2px solid #f1f2f6;
+        }
+
+        .config-section h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+        }
+
+        .config-row {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 20px;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+
+        .config-label {
+            font-weight: 600;
+            color: #34495e;
+        }
+
+        .config-input {
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .config-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .requests-section {
+            padding: 30px;
+        }
+
+        .requests-section h2 {
+            color: #2c3e50;
+            margin-bottom: 30px;
+            font-size: 1.8em;
+        }
+
+        .request-item {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 25px;
+            transition: all 0.3s ease;
+        }
+
+        .request-item:hover {
+            border-color: #667eea;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.1);
+        }
+
+        .request-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .request-title {
+            font-size: 1.3em;
+            font-weight: 700;
+            color: #2c3e50;
+        }
+
+        .request-description {
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+
+        .filters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .filter-label {
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+        }
+
+        .filter-input, .filter-select {
+            padding: 10px;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            font-size: 14px;
+            background: white;
+        }
+
+        .filter-input:focus, .filter-select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+        }
+
+        .request-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .output-path {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .execute-btn {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .execute-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .execute-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status {
+            margin-top: 15px;
+            padding: 12px;
+            border-radius: 6px;
+            font-weight: 500;
+            display: none;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.loading {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        @media (max-width: 768px) {
+            .config-row {
+                grid-template-columns: 1fr;
+            }
+            
+            .request-footer {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .filters-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚽ Football Data API Client</h1>
+            <p>Interface pour interroger l'API Football-Data.org avec filtres personnalisés</p>
+        </div>
+
+        <div class="config-section">
+            <h2>🔧 Configuration</h2>
+            <div class="config-row">
+                <label class="config-label">Clé API :</label>
+                <input type="password" id="apiKey" class="config-input" placeholder="Entrez votre clé API Football-Data.org">
+            </div>
+            <div class="config-row">
+                <label class="config-label">URL de base :</label>
+                <input type="text" id="baseUrl" class="config-input" value="https://api.football-data.org/v4" readonly>
+            </div>
+        </div>
+
+        <div class="requests-section">
+            <h2>📋 Requêtes disponibles</h2>
+            
+            <div class="request-item">
+                <div class="request-header">
+                    <div>
+                        <div class="request-title">Compétitions</div>
+                        <div class="request-description">Liste toutes les compétitions disponibles</div>
+                    </div>
+                </div>
+                <div class="filters-grid">
+                    <div class="filter-group">
+                        <label class="filter-label">Areas (IDs séparés par virgule)</label>
+                        <input type="text" class="filter-input" data-filter="areas" placeholder="ex: 2,5,6">
+                    </div>
+                </div>
+                <div class="request-footer">
+                    <input type="text" class="output-path" placeholder="Chemin de sortie (ex: competitions.json)" value="competitions.json">
+                    <button class="execute-btn" onclick="executeRequest('/competitions', this)">Exécuter</button>
+                </div>
+                <div class="status"></div>
+            </div>
+
+            <div class="request-item">
+                <div class="request-header">
+                    <div>
+                        <div class="request-title">Classements d'une compétition</div>
+                        <div class="request-description">Affiche les classements pour une compétition donnée</div>
+                    </div>
+                </div>
+                <div class="filters-grid">
+                    <div class="filter-group">
+                        <label class="filter-label">ID Compétition</label>
+                        <select class="filter-select" data-filter="competition-id">
+                            <option value="">Sélectionner...</option>
+                            <option value="PL">Premier League</option>
+                            <option value="CL">Champions League</option>
+                            <option value="BL1">Bundesliga</option>
+                            <option value="PD">La Liga</option>
+                            <option value="SA">Serie A</option>
+                            <option value="FL1">Ligue 1</option>
+                            <option value="DED">Eredivisie</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Matchday</label>
+                        <input type="number" class="filter-input" data-filter="matchday" placeholder="ex: 15" min="1">
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Saison</label>
+                        <input type="number" class="filter-input" data-filter="season" placeholder="ex: 2024" min="2000" max="2030">
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Date</label>
+                        <input type="date" class="filter-input" data-filter="date">
+                    </div>
+                </div>
+                <div class="request-footer">
+                    <input type="text" class="output-path" placeholder="Chemin de sortie" value="standings.json">
+                    <button class="execute-btn" onclick="executeStandingsRequest(this)">Exécuter</button>
+                </div>
+                <div class="status"></div>
+            </div>
+
+            <div class="request-item">
+                <div class="request-header">
+                    <div>
+                        <div class="request-title">Matchs d'une compétition</div>
+                        <div class="request-description">Liste tous les matchs pour une compétition</div>
+                    </div>
+                </div>
+                <div class="filters-grid">
+                    <div class="filter-group">
+                        <label class="filter-label">ID Compétition</label>
+                        <select class="filter-select" data-filter="competition-id">
+                            <option value="">Sélectionner...</option>
+                            <option value="PL">Premier League</option>
+                            <option value="CL">Champions League</option>
+                            <option value="BL1">Bundesliga</option>
+                            <option value="PD">La Liga</option>
+                            <option value="SA">Serie A</option>
+                            <option value="FL1">Ligue 1</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Date de début</label>
+                        <input type="date" class="filter-input" data-filter="dateFrom">
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Date de fin</label>
+                        <input type="date" class="filter-input" data-filter="dateTo">
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Statut</label>
+                        <select class="filter-select" data-filter="status">
+                            <option value="">Tous</option>
+                            <option value="SCHEDULED">Programmé</option>
+                            <option value="LIVE">En direct</option>
+                            <option value="IN_PLAY">En cours</option>
+                            <option value="FINISHED">Terminé</option>
+                            <option value="POSTPONED">Reporté</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Matchday</label>
+                        <input type="number" class="filter-input" data-filter="matchday" min="1">
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Saison</label>
+                        <input type="number" class="filter-input" data-filter="season" min="2000" max="2030">
+                    </div>
+                </div>
+                <div class="request-footer">
+                    <input type="text" class="output-path" placeholder="Chemin de sortie" value="matches.json">
+                    <button class="execute-btn" onclick="executeCompetitionMatchesRequest(this)">Exécuter</button>
+                </div>
+                <div class="status"></div>
+            </div>
+
+            <div class="request-item">
+                <div class="request-header">
+                    <div>
+                        <div class="request-title">Équipes d'une compétition</div>
+                        <div class="request-description">Liste toutes les équipes pour une compétition</div>
+                    </div>
+                </div>
+                <div class="filters-grid">
+                    <div class="filter-group">
+                        <label class="filter-label">ID Compétition</label>
+                        <select class="filter-select" data-filter="competition-id">
+                            <option value="">Sélectionner...</option>
+                            <option value="PL">Premier League</option>
+                            <option value="CL">Champions League</option>
+                            <option value="BL1">Bundesliga</option>
+                            <option value="PD">La Liga</option>
+                            <option value="SA">Serie A</option>
+                            <option value="FL1">Ligue 1</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Saison</label>
+                        <input type="number" class="filter-input" data-filter="season" min="2000" max="2030">
+                    </div>
+                </div>
+                <div class="request-footer">
+                    <input type="text" class="output-path" placeholder="Chemin de sortie" value="teams.json">
+                    <button class="execute-btn" onclick="executeCompetitionTeamsRequest(this)">Exécuter</button>
+                </div>
+                <div class="status"></div>
+            </div>
+
+            <div class="request-item">
+                <div class="request-header">
+                    <div>
+                        <div class="request-title">Meilleurs buteurs</div>
+                        <div class="request-description">Liste des meilleurs buteurs d'une compétition</div>
+                    </div>
+                </div>
+                <div class="filters-grid">
+                    <div class="filter-group">
+                        <label class="filter-label">ID Compétition</label>
+                        <select class="filter-select" data-filter="competition-id">
+                            <option value="">Sélectionner...</option>
+                            <option value="PL">Premier League</option>
+                            <option value="CL">Champions League</option>
+                            <option value="BL1">Bundesliga</option>
+                            <option value="PD">La Liga</option>
+                            <option value="SA">Serie A</option>
+                            <option value="FL1">Ligue 1</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Limite</label>
+                        <input type="number" class="filter-input" data-filter="limit" placeholder="10" min="1" max="100">
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Saison</label>
+                        <input type="number" class="filter-input" data-filter="season" min="2000" max="2030">
+                    </div>
+                </div>
+                <div class="request-footer">
+                    <input type="text" class="output-path" placeholder="Chemin de sortie" value="scorers.json">
+                    <button class="execute-btn" onclick="executeScorersRequest(this)">Exécuter</button>
+                </div>
+                <div class="status"></div>
+            </div>
+
+            <div class="request-item">
+                <div class="request-header">
+                    <div>
+                        <div class="request-title">Matchs d'une équipe</div>
+                        <div class="request-description">Liste tous les matchs pour une équipe donnée</div>
+                    </div>
+                </div>
+                <div class="filters-grid">
+                    <div class="filter-group">
+                        <label class="filter-label">ID Équipe</label>
+                        <input type="number" class="filter-input" data-filter="team-id" placeholder="ex: 86 (Real Madrid)">
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Date de début</label>
+                        <input type="date" class="filter-input" data-filter="dateFrom">
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Date de fin</label>
+                        <input type="date" class="filter-input" data-filter="dateTo">
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Statut</label>
+                        <select class="filter-select" data-filter="status">
+                            <option value="">Tous</option>
+                            <option value="SCHEDULED">Programmé</option>
+                            <option value="FINISHED">Terminé</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Lieu</label>
+                        <select class="filter-select" data-filter="venue">
+                            <option value="">Tous</option>
+                            <option value="HOME">Domicile</option>
+                            <option value="AWAY">Extérieur</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="request-footer">
+                    <input type="text" class="output-path" placeholder="Chemin de sortie" value="team_matches.json">
+                    <button class="execute-btn" onclick="executeTeamMatchesRequest(this)">Exécuter</button>
+                </div>
+                <div class="status"></div>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
