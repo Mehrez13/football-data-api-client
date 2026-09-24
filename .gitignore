@@ -98,3 +98,9 @@ api-keys.txt
 downloads/
 data/
 output/
+
+# Scraper FDJ - résultats générés
+cotes_fdj.json
+cotes_fdj.csv
+__pycache__/
+*.pyc
