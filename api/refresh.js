@@ -229,7 +229,7 @@ module.exports = async (req, res) => {
       } catch (err) {
         console.error(`Erreur marches secondaires sur ${e.id}: ${err.message}`);
       }
-      await new Promise((r) => setTimeout(r, 300));
+      await new Promise((r) => setTimeout(r, 550));
     }
 
     const allResults = [...h2hRows, ...secondaryRows].sort(
