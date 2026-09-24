@@ -209,6 +209,12 @@ module.exports = async (req, res) => {
       return fetchJson(url)
         .then((full) => {
           const enriched = { ...full, _competitionTitle: e._competitionTitle, _affiche: e._affiche };
+          if (process.env.DEBUG_MARKETS) {
+            const summary = (full.bookmakers || [])
+              .map((b) => `${b.title}:[${(b.markets || []).map((m) => m.key).join(",")}]`)
+              .join(" | ");
+            console.error(`DEBUG ${e._affiche} (${e.id}): ${summary || "aucun bookmaker retourne"}`);
+          }
           return [...analyzeBtts(enriched), ...analyzeTotals(enriched)];
         })
         .catch((err) => {
