@@ -99,9 +99,8 @@ downloads/
 data/
 output/
 
-# Scraper FDJ - résultats générés
+# Scraper FDJ - résultats générés (cotes brutes, pas besoin en repo)
 cotes_fdj.json
 cotes_fdj.csv
-paris_data.json
 __pycache__/
 *.pyc
