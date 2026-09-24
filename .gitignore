@@ -98,3 +98,8 @@ api-keys.txt
 downloads/
 data/
 output/
+# Scraper Parions Sport
+raw/
+cotes_fdj.json
+cotes_fdj.csv
+__pycache__/
