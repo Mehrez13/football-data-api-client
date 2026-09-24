@@ -48,7 +48,7 @@
     cursor: pointer;
   }
   button#refreshBtn:disabled { opacity: 0.6; cursor: default; }
-  .bar input {
+  .bar input, .bar select {
     background: #0c1120;
     border: 1px solid var(--border);
     color: var(--text);
@@ -57,6 +57,7 @@
     font-size: 0.9em;
     width: 100px;
   }
+  .bar select { width: 140px; }
   .bar label { color: var(--muted); font-size: 0.78em; display: flex; flex-direction: column; gap: 3px; }
   #refreshStatus { font-size: 0.82em; color: var(--muted); }
 
@@ -70,9 +71,11 @@
   th, td { padding: 9px 10px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
   th { color: var(--muted); font-weight: 500; cursor: pointer; user-select: none; position: sticky; top: 0; background: var(--panel); }
   th.active { color: var(--accent); }
+  th.nosort { cursor: default; }
   tbody tr:hover { background: rgba(91,140,255,0.06); }
   tr.safe-pick { background: var(--green-bg); }
   tr.safe-pick:hover { background: rgba(53,193,126,0.22); }
+  tr.in-slip { outline: 1px solid var(--accent); outline-offset: -1px; }
   .prob-high { color: var(--green); font-weight: 600; }
   .ev-pos { color: var(--green); }
   .ev-neg { color: var(--muted); }
@@ -89,11 +92,29 @@
   .empty { padding: 30px; text-align: center; color: var(--muted); }
   .affiche { font-weight: 500; }
   .foot { color: var(--muted); font-size: 0.78em; margin-top: 14px; line-height: 1.5; }
-  .foot dt { color: var(--text); font-weight: 600; display: inline; }
-  .foot dd { display: inline; margin: 0; }
+
+  .slip {
+    background: var(--panel);
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+  .slip h2 { font-size: 0.95em; margin: 0 0 10px; }
+  .slip-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 0.85em; }
+  .slip-row:last-of-type { border-bottom: none; }
+  .slip-row .desc { flex: 1; }
+  .slip-row .cote { color: var(--green); font-weight: 600; min-width: 48px; text-align: right; }
+  .slip-row button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1.1em; line-height: 1; padding: 2px 6px; }
+  .slip-row button:hover { color: var(--amber); }
+  .slip-summary { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .slip-summary label { color: var(--muted); font-size: 0.78em; display: flex; flex-direction: column; gap: 3px; }
+  .slip-summary .result { font-size: 0.85em; }
+  .slip-summary .result .value { font-weight: 700; color: var(--green); }
+  .slip-empty { color: var(--muted); font-size: 0.85em; }
 
   @media (max-width: 640px) {
-    .bar input { width: 100%; }
+    .bar input, .bar select { width: 100%; }
     table, th, td { font-size: 0.78em; }
   }
 </style>
@@ -108,13 +129,18 @@
 <div class="bar">
   <button id="refreshBtn">Actualiser les cotes</button>
   <span id="refreshStatus"></span>
-  <label>Bankroll (EUR)
-    <input type="number" id="bankroll" value="100" min="0" step="10">
+  <label>Bookmaker
+    <select id="bookmaker"><option value="">Tous</option></select>
   </label>
   <label>Probabilite min (%)
     <input type="number" id="minProb" value="0" min="0" max="100" step="5">
   </label>
+  <label>Bankroll (EUR)
+    <input type="number" id="bankroll" value="100" min="0" step="10">
+  </label>
 </div>
+
+<div class="slip" id="slip"></div>
 
 <div class="stats" id="stats"></div>
 
@@ -122,6 +148,7 @@
   <table id="tbl">
     <thead>
       <tr>
+        <th class="nosort"></th>
         <th data-key="date_heure">Date</th>
         <th data-key="affiche">Match</th>
         <th data-key="issue">Issue</th>
@@ -129,7 +156,7 @@
         <th data-key="meilleure_cote">Cote</th>
         <th data-key="bookmaker">Bookmaker</th>
         <th data-key="ev_pct">EV</th>
-        <th data-key="stake_fraction_pct">Mise</th>
+        <th data-key="stake_fraction_pct">Mise Kelly</th>
       </tr>
     </thead>
     <tbody id="tbody"></tbody>
@@ -140,7 +167,8 @@
 <div class="foot">
   <p>
     <span class="badge safe" style="margin-left:0;">SUR</span> = probabilite estimee &ge; 70% que cette issue se
-    produise (trie par defaut du plus probable au moins probable).
+    produise (trie par defaut du plus probable au moins probable). Coche des lignes pour construire un pari
+    combine (plusieurs selections dans "Mon coupon" ci-dessus).
   </p>
   <p>
     <strong>Probabilite</strong> : chance estimee que cette issue arrive, d'apres la moyenne des cotes de tous
@@ -148,7 +176,10 @@
     aussi plus faible.<br>
     <strong>EV</strong> (esperance de gain) : indique si la meilleure cote FR disponible est plus genereuse que
     cette probabilite ne le justifierait. Une EV positive n'est pas une garantie de gain, et un favori tres
-    probable peut avoir une EV proche de 0 ou negative si sa cote est deja "juste".
+    probable peut avoir une EV proche de 0 ou negative si sa cote est deja "juste".<br>
+    <strong>Combine</strong> : la cote et la probabilite d'un coupon a plusieurs selections se multiplient entre
+    elles - plus il y a de selections, plus le gain potentiel grimpe mais plus la probabilite de tout gagner
+    chute.
   </p>
   <p>
     Ceci reste une estimation statistique, pas une prediction fiable. Kelly fractionne (25%), plafonne a 5% de
@@ -158,9 +189,35 @@
 
 <script>
 const SAFE_PROB_THRESHOLD = 70;
+const SLIP_STORAGE_KEY = "parisSportSlip";
+const DEFAULT_BOOKMAKER = "PMU (FR)";
+
 let RAW = [];
 let sortKey = "probabilite_marche_pct";
 let sortDir = -1;
+let SLIP = loadSlip();
+let bookmakerInitialized = false;
+
+function loadSlip() {
+  try {
+    const raw = localStorage.getItem(SLIP_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveSlip() {
+  try {
+    localStorage.setItem(SLIP_STORAGE_KEY, JSON.stringify(SLIP));
+  } catch {
+    /* stockage indisponible: le coupon reste actif pour cette session seulement */
+  }
+}
+
+function rowKey(r) {
+  return [r.affiche, r.issue, r.bookmaker, r.date_heure].join("|");
+}
 
 function fmtDate(iso) {
   if (!iso) return "-";
@@ -169,8 +226,19 @@ function fmtDate(iso) {
   return d.toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
+function populateBookmakers(data) {
+  const sel = document.getElementById("bookmaker");
+  const current = bookmakerInitialized ? sel.value : DEFAULT_BOOKMAKER;
+  sel.innerHTML = '<option value="">Tous</option>';
+  const books = [...new Set(data.map(r => r.bookmaker))].sort();
+  books.forEach(b => sel.appendChild(new Option(b, b)));
+  if ([...sel.options].some(o => o.value === current)) sel.value = current;
+  bookmakerInitialized = true;
+}
+
 function currentFilters() {
   return {
+    bookmaker: document.getElementById("bookmaker").value,
     minProb: parseFloat(document.getElementById("minProb").value || "0"),
     bankroll: parseFloat(document.getElementById("bankroll").value || "0"),
   };
@@ -178,7 +246,10 @@ function currentFilters() {
 
 function render() {
   const f = currentFilters();
-  let rows = RAW.filter(r => r.probabilite_marche_pct >= f.minProb);
+  let rows = RAW.filter(r =>
+    r.probabilite_marche_pct >= f.minProb &&
+    (!f.bookmaker || r.bookmaker === f.bookmaker)
+  );
 
   rows.sort((a, b) => {
     const va = a[sortKey], vb = b[sortKey];
@@ -186,6 +257,7 @@ function render() {
     return sortDir * ((va ?? 0) - (vb ?? 0));
   });
 
+  const slipKeys = new Set(SLIP.map(rowKey));
   const tbody = document.getElementById("tbody");
   tbody.innerHTML = "";
   document.getElementById("empty").style.display = rows.length ? "none" : "block";
@@ -193,9 +265,13 @@ function render() {
   for (const r of rows.slice(0, 300)) {
     const tr = document.createElement("tr");
     const isSafe = r.probabilite_marche_pct >= SAFE_PROB_THRESHOLD;
+    const key = rowKey(r);
+    const checked = slipKeys.has(key);
     if (isSafe) tr.classList.add("safe-pick");
+    if (checked) tr.classList.add("in-slip");
     const stakeAmount = (f.bankroll * r.stake_fraction_pct / 100).toFixed(2);
     tr.innerHTML = `
+      <td><input type="checkbox" class="pick" data-key="${key}" ${checked ? "checked" : ""}></td>
       <td class="muted">${fmtDate(r.date_heure)}</td>
       <td class="affiche">${r.affiche}<div class="muted">${r.competition}</div></td>
       <td>${r.issue}</td>
@@ -205,10 +281,26 @@ function render() {
       <td class="${r.ev_pct > 0 ? 'ev-pos' : 'ev-neg'}">${r.ev_pct > 0 ? '+' : ''}${r.ev_pct.toFixed(2)}%</td>
       <td>${stakeAmount} EUR</td>
     `;
+    tr.querySelector(".pick").addEventListener("change", (e) => togglePick(r, e.target.checked));
     tbody.appendChild(tr);
   }
 
   renderStats(rows);
+  renderSlip();
+}
+
+function togglePick(row, add) {
+  const key = rowKey(row);
+  SLIP = SLIP.filter(s => rowKey(s) !== key);
+  if (add) {
+    SLIP.push({
+      affiche: row.affiche, competition: row.competition, issue: row.issue,
+      bookmaker: row.bookmaker, date_heure: row.date_heure,
+      meilleure_cote: row.meilleure_cote, probabilite_marche_pct: row.probabilite_marche_pct,
+    });
+  }
+  saveSlip();
+  render();
 }
 
 function renderStats(rows) {
@@ -222,6 +314,57 @@ function renderStats(rows) {
   `;
 }
 
+function renderSlip() {
+  const el = document.getElementById("slip");
+  if (SLIP.length === 0) {
+    el.innerHTML = `<h2>Mon coupon</h2><div class="slip-empty">Aucune selection. Coche des lignes du tableau pour construire un pari combine.</div>`;
+    return;
+  }
+
+  const rowsHtml = SLIP.map(s => `
+    <div class="slip-row">
+      <div class="desc">${s.affiche} <span class="muted">- ${s.issue}</span><div class="muted">${s.competition} - ${s.bookmaker}</div></div>
+      <div class="cote">${s.meilleure_cote.toFixed(2)}</div>
+      <button type="button" data-remove="${rowKey(s)}" title="Retirer">&times;</button>
+    </div>
+  `).join("");
+
+  const combinedOdds = SLIP.reduce((acc, s) => acc * s.meilleure_cote, 1);
+  const combinedProb = SLIP.reduce((acc, s) => acc * (s.probabilite_marche_pct / 100), 1) * 100;
+  const stakeInput = el.querySelector("#slipStake");
+  const stake = stakeInput ? parseFloat(stakeInput.value || "0") : 10;
+  const payout = stake * combinedOdds;
+
+  el.innerHTML = `
+    <h2>Mon coupon (${SLIP.length} selection${SLIP.length > 1 ? "s" : ""})</h2>
+    ${rowsHtml}
+    <div class="slip-summary">
+      <label>Mise (EUR)
+        <input type="number" id="slipStake" value="${stake}" min="0" step="1">
+      </label>
+      <div class="result">Cote combinee : <span class="value">${combinedOdds.toFixed(2)}</span></div>
+      <div class="result">Gain potentiel : <span class="value">${payout.toFixed(2)} EUR</span></div>
+      <div class="result">Probabilite combinee estimee : <span class="value">${combinedProb.toFixed(1)}%</span></div>
+      <button type="button" id="clearSlip" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:4px 10px;cursor:pointer;">Vider le coupon</button>
+    </div>
+  `;
+
+  el.querySelectorAll("[data-remove]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const key = btn.dataset.remove;
+      SLIP = SLIP.filter(s => rowKey(s) !== key);
+      saveSlip();
+      render();
+    });
+  });
+  el.querySelector("#slipStake").addEventListener("input", renderSlip);
+  el.querySelector("#clearSlip").addEventListener("click", () => {
+    SLIP = [];
+    saveSlip();
+    render();
+  });
+}
+
 document.querySelectorAll("th[data-key]").forEach(th => {
   th.addEventListener("click", () => {
     const key = th.dataset.key;
@@ -232,16 +375,17 @@ document.querySelectorAll("th[data-key]").forEach(th => {
   });
 });
 
-["bankroll", "minProb"].forEach(id => {
+["bankroll", "minProb", "bookmaker"].forEach(id => {
   document.getElementById(id).addEventListener("input", render);
 });
 
 function loadInitial() {
   fetch("paris_data.json")
     .then(r => { if (!r.ok) throw new Error("no snapshot"); return r.json(); })
-    .then(data => { RAW = data; render(); })
+    .then(data => { RAW = data; populateBookmakers(data); render(); })
     .catch(() => {
       document.getElementById("refreshStatus").textContent = "Pas de donnees enregistrees - clique sur Actualiser.";
+      renderSlip();
     });
 }
 
@@ -258,6 +402,7 @@ async function refreshData() {
     if (!res.ok) throw new Error(data.error || `Erreur ${res.status}`);
 
     RAW = data;
+    populateBookmakers(data);
     render();
     status.textContent = `Mis a jour ${new Date().toLocaleTimeString("fr-FR")} - ${data.length} ligne(s)`;
   } catch (err) {
