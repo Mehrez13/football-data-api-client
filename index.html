@@ -60,6 +60,17 @@
   .bar select { width: 140px; }
   .bar label { color: var(--muted); font-size: 0.78em; display: flex; flex-direction: column; gap: 3px; }
   #refreshStatus { font-size: 0.82em; color: var(--muted); }
+  #sortDirBtn, #resetBtn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 0.9em;
+    cursor: pointer;
+    align-self: flex-end;
+  }
+  #resetBtn { color: var(--muted); }
 
   .stats { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
   .stat { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 8px 14px; min-width: 100px; }
@@ -132,12 +143,26 @@
   <label>Bookmaker
     <select id="bookmaker"><option value="">Tous</option></select>
   </label>
+  <label>Championnat
+    <select id="competition"><option value="">Tous</option></select>
+  </label>
   <label>Probabilite min (%)
     <input type="number" id="minProb" value="0" min="0" max="100" step="5">
   </label>
   <label>Bankroll (EUR)
     <input type="number" id="bankroll" value="100" min="0" step="10">
   </label>
+  <label>Trier par
+    <select id="sortKeySelect">
+      <option value="probabilite_marche_pct">Probabilite</option>
+      <option value="date_heure">Date</option>
+      <option value="ev_pct">EV</option>
+      <option value="meilleure_cote">Cote</option>
+      <option value="stake_fraction_pct">Mise Kelly</option>
+    </select>
+  </label>
+  <button id="sortDirBtn" title="Inverser l'ordre">Desc.</button>
+  <button id="resetBtn">Reinitialiser les filtres</button>
 </div>
 
 <div class="slip" id="slip"></div>
@@ -179,11 +204,15 @@
     probable peut avoir une EV proche de 0 ou negative si sa cote est deja "juste".<br>
     <strong>Combine</strong> : la cote et la probabilite d'un coupon a plusieurs selections se multiplient entre
     elles - plus il y a de selections, plus le gain potentiel grimpe mais plus la probabilite de tout gagner
-    chute.
+    chute.<br>
+    <strong>Mise Kelly</strong> : le critere de Kelly calcule, a partir de la cote et de la probabilite estimee,
+    la part de bankroll a miser qui maximise la croissance de ton capital sur le long terme (plus l'avantage
+    estime est grand, plus la mise suggeree est grande). Ici on utilise un Kelly "fractionne" a 25% (un quart de
+    la mise theorique) et plafonne a 5% de la bankroll par pari, pour rester prudent : le Kelly plein est tres
+    agressif et peut faire perdre une grosse partie du capital en cas d'erreur d'estimation.
   </p>
   <p>
-    Ceci reste une estimation statistique, pas une prediction fiable. Kelly fractionne (25%), plafonne a 5% de
-    la bankroll. Aide : 09 74 75 13 13 (joueurs-info-service.fr).
+    Ceci reste une estimation statistique, pas une prediction fiable. Aide : 09 74 75 13 13 (joueurs-info-service.fr).
   </p>
 </div>
 
@@ -236,9 +265,19 @@ function populateBookmakers(data) {
   bookmakerInitialized = true;
 }
 
+function populateCompetitions(data) {
+  const sel = document.getElementById("competition");
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Tous</option>';
+  const comps = [...new Set(data.map(r => r.competition))].sort();
+  comps.forEach(c => sel.appendChild(new Option(c, c)));
+  if ([...sel.options].some(o => o.value === current)) sel.value = current;
+}
+
 function currentFilters() {
   return {
     bookmaker: document.getElementById("bookmaker").value,
+    competition: document.getElementById("competition").value,
     minProb: parseFloat(document.getElementById("minProb").value || "0"),
     bankroll: parseFloat(document.getElementById("bankroll").value || "0"),
   };
@@ -248,7 +287,8 @@ function render() {
   const f = currentFilters();
   let rows = RAW.filter(r =>
     r.probabilite_marche_pct >= f.minProb &&
-    (!f.bookmaker || r.bookmaker === f.bookmaker)
+    (!f.bookmaker || r.bookmaker === f.bookmaker) &&
+    (!f.competition || r.competition === f.competition)
   );
 
   rows.sort((a, b) => {
@@ -365,24 +405,56 @@ function renderSlip() {
   });
 }
 
-document.querySelectorAll("th[data-key]").forEach(th => {
-  th.addEventListener("click", () => {
-    const key = th.dataset.key;
-    if (sortKey === key) { sortDir *= -1; } else { sortKey = key; sortDir = -1; }
-    document.querySelectorAll("th").forEach(t => t.classList.remove("active"));
-    th.classList.add("active");
-    render();
+function syncSortControls() {
+  document.getElementById("sortKeySelect").value = sortKey;
+  document.getElementById("sortDirBtn").textContent = sortDir === -1 ? "Desc." : "Asc.";
+  document.querySelectorAll("th[data-key]").forEach(t => {
+    t.classList.toggle("active", t.dataset.key === sortKey);
   });
+}
+
+function setSort(key) {
+  if (sortKey === key) { sortDir *= -1; } else { sortKey = key; sortDir = -1; }
+  syncSortControls();
+  render();
+}
+
+document.querySelectorAll("th[data-key]").forEach(th => {
+  th.addEventListener("click", () => setSort(th.dataset.key));
 });
 
-["bankroll", "minProb", "bookmaker"].forEach(id => {
+document.getElementById("sortKeySelect").addEventListener("change", (e) => {
+  sortKey = e.target.value;
+  syncSortControls();
+  render();
+});
+
+document.getElementById("sortDirBtn").addEventListener("click", () => {
+  sortDir *= -1;
+  syncSortControls();
+  render();
+});
+
+document.getElementById("resetBtn").addEventListener("click", () => {
+  document.getElementById("bookmaker").value = DEFAULT_BOOKMAKER;
+  document.getElementById("competition").value = "";
+  document.getElementById("minProb").value = "0";
+  sortKey = "probabilite_marche_pct";
+  sortDir = -1;
+  syncSortControls();
+  render();
+});
+
+["bankroll", "minProb", "bookmaker", "competition"].forEach(id => {
   document.getElementById(id).addEventListener("input", render);
 });
+
+syncSortControls();
 
 function loadInitial() {
   fetch("paris_data.json")
     .then(r => { if (!r.ok) throw new Error("no snapshot"); return r.json(); })
-    .then(data => { RAW = data; populateBookmakers(data); render(); })
+    .then(data => { RAW = data; populateBookmakers(data); populateCompetitions(data); render(); })
     .catch(() => {
       document.getElementById("refreshStatus").textContent = "Pas de donnees enregistrees - clique sur Actualiser.";
       renderSlip();
@@ -403,6 +475,7 @@ async function refreshData() {
 
     RAW = data;
     populateBookmakers(data);
+    populateCompetitions(data);
     render();
     status.textContent = `Mis a jour ${new Date().toLocaleTimeString("fr-FR")} - ${data.length} ligne(s)`;
   } catch (err) {
