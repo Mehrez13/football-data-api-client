@@ -134,15 +134,12 @@
 
 <header>
   <h1>Bonnes cotes - Football</h1>
-  <span class="muted">The Odds API - bookmakers licencies FR</span>
+  <span class="muted">Cotes PMU (FR) uniquement</span>
 </header>
 
 <div class="bar">
   <button id="refreshBtn">Actualiser les cotes</button>
   <span id="refreshStatus"></span>
-  <label>Bookmaker
-    <select id="bookmaker"><option value="">Tous</option></select>
-  </label>
   <label>Championnat
     <select id="competition"><option value="">Tous</option></select>
   </label>
@@ -186,8 +183,7 @@
         <th data-key="marche">Marche</th>
         <th data-key="issue">Issue</th>
         <th data-key="probabilite_marche_pct">Probabilite</th>
-        <th data-key="meilleure_cote">Cote</th>
-        <th data-key="bookmaker">Bookmaker</th>
+        <th data-key="meilleure_cote">Cote PMU</th>
         <th data-key="ev_pct">EV</th>
         <th data-key="stake_fraction_pct">Mise Kelly</th>
       </tr>
@@ -198,6 +194,13 @@
 </div>
 
 <div class="foot">
+  <p>
+    <strong>Cotes PMU (FR) uniquement</strong> : la cote et la mise affichees sont toujours celles de PMU
+    (l'operateur utilise en bureau de tabac), jamais un autre bookmaker. Si PMU ne cote pas encore un match, il
+    n'apparait simplement pas dans la liste (pas de repli automatique vers un autre operateur). La
+    <em>probabilite</em>, elle, reste calculee sur l'ensemble du marche (tous bookmakers confondus) pour rester
+    statistiquement fiable.
+  </p>
   <p>
     <span class="badge safe" style="margin-left:0;">SUR</span> = probabilite estimee &ge; 70% que cette issue se
     produise (trie par defaut du plus probable au moins probable). Coche des lignes pour construire un pari
@@ -235,13 +238,11 @@
 <script>
 const SAFE_PROB_THRESHOLD = 70;
 const SLIP_STORAGE_KEY = "parisSportSlip";
-const DEFAULT_BOOKMAKER = "PMU (FR)";
 
 let RAW = [];
 let sortKey = "probabilite_marche_pct";
 let sortDir = -1;
 let SLIP = loadSlip();
-let bookmakerInitialized = false;
 
 function loadSlip() {
   try {
@@ -271,16 +272,6 @@ function fmtDate(iso) {
   return d.toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
-function populateBookmakers(data) {
-  const sel = document.getElementById("bookmaker");
-  const current = bookmakerInitialized ? sel.value : DEFAULT_BOOKMAKER;
-  sel.innerHTML = '<option value="">Tous</option>';
-  const books = [...new Set(data.map(r => r.bookmaker))].sort();
-  books.forEach(b => sel.appendChild(new Option(b, b)));
-  if ([...sel.options].some(o => o.value === current)) sel.value = current;
-  bookmakerInitialized = true;
-}
-
 function populateCompetitions(data) {
   const sel = document.getElementById("competition");
   const current = sel.value;
@@ -292,7 +283,6 @@ function populateCompetitions(data) {
 
 function currentFilters() {
   return {
-    bookmaker: document.getElementById("bookmaker").value,
     competition: document.getElementById("competition").value,
     marche: document.getElementById("marche").value,
     minProb: parseFloat(document.getElementById("minProb").value || "0"),
@@ -304,7 +294,6 @@ function render() {
   const f = currentFilters();
   let rows = RAW.filter(r =>
     r.probabilite_marche_pct >= f.minProb &&
-    (!f.bookmaker || r.bookmaker === f.bookmaker) &&
     (!f.competition || r.competition === f.competition) &&
     (!f.marche || (r.marche || "1N2") === f.marche)
   );
@@ -336,7 +325,6 @@ function render() {
       <td>${r.issue}</td>
       <td class="${isSafe ? 'prob-high' : ''}">${r.probabilite_marche_pct.toFixed(1)}%${isSafe ? '<span class="badge safe">SUR</span>' : ''}${r.arbitrage ? '<span class="badge arb">ARB</span>' : ''}</td>
       <td>${r.meilleure_cote.toFixed(2)}</td>
-      <td class="muted">${r.bookmaker}</td>
       <td class="${r.ev_pct > 0 ? 'ev-pos' : 'ev-neg'}">${r.ev_pct > 0 ? '+' : ''}${r.ev_pct.toFixed(2)}%</td>
       <td>${stakeAmount} EUR</td>
     `;
@@ -455,7 +443,6 @@ document.getElementById("sortDirBtn").addEventListener("click", () => {
 });
 
 document.getElementById("resetBtn").addEventListener("click", () => {
-  document.getElementById("bookmaker").value = DEFAULT_BOOKMAKER;
   document.getElementById("competition").value = "";
   document.getElementById("marche").value = "";
   document.getElementById("minProb").value = "0";
@@ -465,7 +452,7 @@ document.getElementById("resetBtn").addEventListener("click", () => {
   render();
 });
 
-["bankroll", "minProb", "bookmaker", "competition", "marche"].forEach(id => {
+["bankroll", "minProb", "competition", "marche"].forEach(id => {
   document.getElementById(id).addEventListener("input", render);
 });
 
@@ -474,7 +461,7 @@ syncSortControls();
 function loadInitial() {
   fetch("paris_data.json")
     .then(r => { if (!r.ok) throw new Error("no snapshot"); return r.json(); })
-    .then(data => { RAW = data; populateBookmakers(data); populateCompetitions(data); render(); })
+    .then(data => { RAW = data; populateCompetitions(data); render(); })
     .catch(() => {
       document.getElementById("refreshStatus").textContent = "Pas de donnees enregistrees - clique sur Actualiser.";
       renderSlip();
@@ -494,7 +481,6 @@ async function refreshData() {
     if (!res.ok) throw new Error(data.error || `Erreur ${res.status}`);
 
     RAW = data;
-    populateBookmakers(data);
     populateCompetitions(data);
     render();
     status.textContent = `Mis a jour ${new Date().toLocaleTimeString("fr-FR")} - ${data.length} ligne(s)`;

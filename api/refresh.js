@@ -17,7 +17,12 @@ const EUROPEAN_FOOTBALL_KEYS = new Set([
 ]);
 
 const EXCHANGES = new Set(["Betfair", "Matchbook", "Smarkets"]);
-const FRENCH_LICENSED_BOOKMAKERS = new Set(["Winamax (FR)", "Betclic (FR)", "Unibet (FR)", "PMU (FR)"]);
+// La probabilite "de marche" (devig) reste calculee sur tout le panel de
+// bookmakers non-exchange pour rester statistiquement fiable, mais la cote
+// affichee/jouable ne vient plus que de PMU (FR) : c'est le seul operateur
+// utilise (mises passees en bureau de tabac). Si PMU ne cote pas un match,
+// il n'apparait simplement pas - pas de repli vers un autre bookmaker.
+const BETTING_BOOKMAKER = "PMU (FR)";
 
 const KELLY_FRACTION = 0.25;
 const MAX_STAKE_PCT = 0.05;
@@ -71,20 +76,16 @@ function devigMarket(bookmakers, marketKey, expectedOutcomes) {
   return fairProb;
 }
 
-function bestOddsForMarket(bookmakers, marketKey) {
-  const legalBooks = bookmakers.filter((b) => FRENCH_LICENSED_BOOKMAKERS.has(b.title));
-  const best = {};
-  for (const bm of legalBooks) {
-    const market = (bm.markets || []).find((m) => m.key === marketKey);
-    if (!market) continue;
-    for (const outcome of market.outcomes || []) {
-      const current = best[outcome.name];
-      if (!current || outcome.price > current.odds) {
-        best[outcome.name] = { odds: outcome.price, bookmaker: bm.title, point: outcome.point };
-      }
-    }
+function pmuOddsForMarket(bookmakers, marketKey) {
+  const pmu = bookmakers.find((b) => b.title === BETTING_BOOKMAKER);
+  if (!pmu) return {};
+  const market = (pmu.markets || []).find((m) => m.key === marketKey);
+  if (!market) return {};
+  const odds = {};
+  for (const outcome of market.outcomes || []) {
+    odds[outcome.name] = { odds: outcome.price, bookmaker: pmu.title, point: outcome.point };
   }
-  return best;
+  return odds;
 }
 
 function kellyStake(bestOdds, fairProb) {
@@ -135,16 +136,18 @@ function analyzeH2h(event) {
   const fairProb = devigMarket(bookmakers, "h2h", 3);
   if (Object.keys(fairProb).length === 0) return [];
 
-  const best = bestOddsForMarket(bookmakers, "h2h");
-  return buildRows(event, "1N2", best, fairProb, (name) => (name === home ? "1" : name === away ? "2" : "N"));
+  const pmuOdds = pmuOddsForMarket(bookmakers, "h2h");
+  if (Object.keys(pmuOdds).length === 0) return [];
+  return buildRows(event, "1N2", pmuOdds, fairProb, (name) => (name === home ? "1" : name === away ? "2" : "N"));
 }
 
 function analyzeTotals(event) {
   const bookmakers = (event.bookmakers || []).filter((b) => !EXCHANGES.has(b.title));
   const fairProb = devigMarket(bookmakers, "totals", 2);
   if (Object.keys(fairProb).length === 0) return [];
-  const best = bestOddsForMarket(bookmakers, "totals");
-  return buildRows(event, "Buts", best, fairProb, (name, info) => {
+  const pmuOdds = pmuOddsForMarket(bookmakers, "totals");
+  if (Object.keys(pmuOdds).length === 0) return [];
+  return buildRows(event, "Buts", pmuOdds, fairProb, (name, info) => {
     const line = info.point != null ? info.point : "2.5";
     return name === "Over" ? `+ de ${line} buts` : `- de ${line} buts`;
   });
