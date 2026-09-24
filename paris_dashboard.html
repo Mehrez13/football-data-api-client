@@ -265,9 +265,9 @@ document.querySelectorAll("th[data-key]").forEach(th => {
 
 function loadInitial() {
   fetch("paris_data.json")
-    .then(r => r.json())
+    .then(r => { if (!r.ok) throw new Error("no snapshot"); return r.json(); })
     .then(data => { RAW = data; populateFilters(data); render(); })
-    .catch(() => { document.getElementById("empty").style.display = "block"; });
+    .catch(() => { refreshData(); });
 }
 
 async function refreshData() {
