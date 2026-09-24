@@ -22,6 +22,14 @@ const FRENCH_LICENSED_BOOKMAKERS = new Set(["Winamax (FR)", "Betclic (FR)", "Uni
 const KELLY_FRACTION = 0.25;
 const MAX_STAKE_PCT = 0.05;
 
+// Marches secondaires (BTTS, over/under buts) : l'API ne les fournit que via
+// l'endpoint par match (1 credit par marche par match interroge), contre 1
+// credit par championnat entier pour le 1N2. Pour ne pas exploser le quota
+// gratuit, on ne va les chercher QUE pour les matchs ou une issue 1N2 a deja
+// une probabilite tres elevee (favori tres marque).
+const SECONDARY_MARKETS = "btts,totals";
+const SECONDARY_MARKETS_PROB_THRESHOLD = 75;
+
 async function fetchJson(url) {
   const res = await fetch(url);
   if (!res.ok) {
@@ -31,15 +39,44 @@ async function fetchJson(url) {
   return res.json();
 }
 
-function devigOutcomes(bookmaker, expectedOutcomes) {
-  const market = (bookmaker.markets || []).find((m) => m.key === "h2h");
-  if (!market) return null;
-  const outcomes = market.outcomes || [];
-  if (outcomes.length < expectedOutcomes) return null;
-  const inv = outcomes.map((o) => ({ name: o.name, inv: 1 / o.price }));
-  const total = inv.reduce((s, o) => s + o.inv, 0);
-  if (total <= 0) return null;
-  return Object.fromEntries(inv.map((o) => [o.name, o.inv / total]));
+function devigMarket(bookmakers, marketKey, expectedOutcomes) {
+  const fairSums = {};
+  const fairCounts = {};
+  for (const bm of bookmakers) {
+    const market = (bm.markets || []).find((m) => m.key === marketKey);
+    if (!market) continue;
+    const outcomes = market.outcomes || [];
+    if (outcomes.length < expectedOutcomes) continue;
+    const inv = outcomes.map((o) => ({ name: o.name, inv: 1 / o.price }));
+    const total = inv.reduce((s, o) => s + o.inv, 0);
+    if (total <= 0) continue;
+    for (const o of inv) {
+      const fair = o.inv / total;
+      fairSums[o.name] = (fairSums[o.name] || 0) + fair;
+      fairCounts[o.name] = (fairCounts[o.name] || 0) + 1;
+    }
+  }
+  const fairProb = {};
+  for (const name of Object.keys(fairSums)) {
+    fairProb[name] = fairSums[name] / fairCounts[name];
+  }
+  return fairProb;
+}
+
+function bestOddsForMarket(bookmakers, marketKey) {
+  const legalBooks = bookmakers.filter((b) => FRENCH_LICENSED_BOOKMAKERS.has(b.title));
+  const best = {};
+  for (const bm of legalBooks) {
+    const market = (bm.markets || []).find((m) => m.key === marketKey);
+    if (!market) continue;
+    for (const outcome of market.outcomes || []) {
+      const current = best[outcome.name];
+      if (!current || outcome.price > current.odds) {
+        best[outcome.name] = { odds: outcome.price, bookmaker: bm.title, point: outcome.point };
+      }
+    }
+  }
+  return best;
 }
 
 function kellyStake(bestOdds, fairProb) {
@@ -50,53 +87,19 @@ function kellyStake(bestOdds, fairProb) {
   return Math.max(0, edge / b);
 }
 
-function analyzeEvent(event) {
-  const home = event.home_team;
-  const away = event.away_team;
-  const affiche = home && away ? `${home} - ${away}` : event.id;
-
-  const bookmakers = (event.bookmakers || []).filter((b) => !EXCHANGES.has(b.title));
-
-  const fairSums = {};
-  const fairCounts = {};
-  for (const bm of bookmakers) {
-    const devig = devigOutcomes(bm, 3);
-    if (!devig) continue;
-    for (const [name, prob] of Object.entries(devig)) {
-      fairSums[name] = (fairSums[name] || 0) + prob;
-      fairCounts[name] = (fairCounts[name] || 0) + 1;
-    }
-  }
-  const fairProb = {};
-  for (const name of Object.keys(fairSums)) {
-    fairProb[name] = fairSums[name] / fairCounts[name];
-  }
-  if (Object.keys(fairProb).length === 0) return [];
-
-  const legalBooks = bookmakers.filter((b) => FRENCH_LICENSED_BOOKMAKERS.has(b.title));
-  const best = {};
-  for (const bm of legalBooks) {
-    const market = (bm.markets || []).find((m) => m.key === "h2h");
-    if (!market) continue;
-    for (const outcome of market.outcomes || []) {
-      const current = best[outcome.name];
-      if (!current || outcome.price > current.odds) {
-        best[outcome.name] = { odds: outcome.price, bookmaker: bm.title };
-      }
-    }
-  }
-
+function buildRows(event, marketKey, best, fairProb, issueLabels) {
   const results = [];
   for (const [name, info] of Object.entries(best)) {
     const p = fairProb[name];
     if (p == null) continue;
     const evPct = (info.odds * p - 1) * 100;
     const stakeFraction = Math.min(kellyStake(info.odds, p) * KELLY_FRACTION, MAX_STAKE_PCT);
-    const issue = name === home ? "1" : name === away ? "2" : "N";
+    const issue = issueLabels ? issueLabels(name, info) : name;
 
     results.push({
+      marche: marketKey,
       competition: event._competitionTitle,
-      affiche,
+      affiche: event._affiche,
       date_heure: event.commence_time,
       issue,
       meilleure_cote: Math.round(info.odds * 1000) / 1000,
@@ -116,6 +119,37 @@ function analyzeEvent(event) {
   return results;
 }
 
+function analyzeH2h(event) {
+  const home = event.home_team;
+  const away = event.away_team;
+  const bookmakers = (event.bookmakers || []).filter((b) => !EXCHANGES.has(b.title));
+
+  const fairProb = devigMarket(bookmakers, "h2h", 3);
+  if (Object.keys(fairProb).length === 0) return [];
+
+  const best = bestOddsForMarket(bookmakers, "h2h");
+  return buildRows(event, "1N2", best, fairProb, (name) => (name === home ? "1" : name === away ? "2" : "N"));
+}
+
+function analyzeBtts(event) {
+  const bookmakers = (event.bookmakers || []).filter((b) => !EXCHANGES.has(b.title));
+  const fairProb = devigMarket(bookmakers, "btts", 2);
+  if (Object.keys(fairProb).length === 0) return [];
+  const best = bestOddsForMarket(bookmakers, "btts");
+  return buildRows(event, "BTTS", best, fairProb, (name) => (name === "Yes" ? "Les 2 equipes marquent" : "Pas les 2 equipes"));
+}
+
+function analyzeTotals(event) {
+  const bookmakers = (event.bookmakers || []).filter((b) => !EXCHANGES.has(b.title));
+  const fairProb = devigMarket(bookmakers, "totals", 2);
+  if (Object.keys(fairProb).length === 0) return [];
+  const best = bestOddsForMarket(bookmakers, "totals");
+  return buildRows(event, "Buts", best, fairProb, (name, info) => {
+    const line = info.point != null ? info.point : "2.5";
+    return name === "Over" ? `+ de ${line} buts` : `- de ${line} buts`;
+  });
+}
+
 module.exports = async (req, res) => {
   const apiKey = process.env.ODDS_API_KEY;
   if (!apiKey) {
@@ -127,32 +161,67 @@ module.exports = async (req, res) => {
     const sports = await fetchJson(`${API_BASE}/sports?apiKey=${apiKey}`);
     const now = Date.now();
 
-    const tasks = [];
     const competitions = sports.filter(
       (s) =>
         s.group === SPORT_GROUPS.Football &&
         !s.has_outrights &&
         (EUROPEAN_FOOTBALL_KEYS.has(s.key) || s.key.startsWith("soccer_uefa_"))
     );
-    for (const comp of competitions) {
-      const url = `${API_BASE}/sports/${comp.key}/odds?apiKey=${apiKey}&regions=${REGIONS}&markets=${MARKETS}&oddsFormat=decimal&dateFormat=iso`;
-      tasks.push(
-        fetchJson(url)
-          .then((events) =>
-            events
-              .filter((e) => new Date(e.commence_time).getTime() > now)
-              .map((e) => ({ ...e, _competitionTitle: comp.title }))
-              .flatMap((e) => analyzeEvent(e))
-          )
-          .catch((err) => {
-            console.error(`Erreur sur ${comp.key}: ${err.message}`);
-            return [];
-          })
-      );
-    }
 
-    const chunks = await Promise.all(tasks);
-    const allResults = chunks.flat().sort((a, b) => b.probabilite_marche_pct - a.probabilite_marche_pct);
+    // Etape 1 : 1N2 par lot (1 credit par championnat).
+    const h2hTasks = competitions.map((comp) => {
+      const url = `${API_BASE}/sports/${comp.key}/odds?apiKey=${apiKey}&regions=${REGIONS}&markets=${MARKETS}&oddsFormat=decimal&dateFormat=iso`;
+      return fetchJson(url)
+        .then((events) =>
+          events
+            .filter((e) => new Date(e.commence_time).getTime() > now)
+            .map((e) => ({
+              ...e,
+              _competitionTitle: comp.title,
+              _sportKey: comp.key,
+              _affiche: e.home_team && e.away_team ? `${e.home_team} - ${e.away_team}` : e.id,
+            }))
+        )
+        .catch((err) => {
+          console.error(`Erreur sur ${comp.key}: ${err.message}`);
+          return [];
+        });
+    });
+
+    const eventsByCompetition = await Promise.all(h2hTasks);
+    const allEvents = eventsByCompetition.flat();
+    const h2hRows = allEvents.flatMap((e) => analyzeH2h(e));
+
+    // Etape 2 : marches secondaires (BTTS, buts) uniquement pour les matchs
+    // ayant deja une issue 1N2 tres favorite (>= seuil), pour limiter le
+    // nombre d'appels par match (chacun coute des credits en plus).
+    const flaggedEvents = allEvents.filter((e) =>
+      h2hRows.some(
+        (r) =>
+          r.affiche === e._affiche &&
+          r.date_heure === e.commence_time &&
+          r.probabilite_marche_pct >= SECONDARY_MARKETS_PROB_THRESHOLD
+      )
+    );
+
+    const secondaryTasks = flaggedEvents.map((e) => {
+      const url = `${API_BASE}/sports/${e._sportKey}/events/${e.id}/odds?apiKey=${apiKey}&regions=${REGIONS}&markets=${SECONDARY_MARKETS}&oddsFormat=decimal&dateFormat=iso`;
+      return fetchJson(url)
+        .then((full) => {
+          const enriched = { ...full, _competitionTitle: e._competitionTitle, _affiche: e._affiche };
+          return [...analyzeBtts(enriched), ...analyzeTotals(enriched)];
+        })
+        .catch((err) => {
+          console.error(`Erreur marches secondaires sur ${e.id}: ${err.message}`);
+          return [];
+        });
+    });
+
+    const secondaryRows = (await Promise.all(secondaryTasks)).flat();
+
+    const allResults = [...h2hRows, ...secondaryRows].sort(
+      (a, b) => b.probabilite_marche_pct - a.probabilite_marche_pct
+    );
 
     res.setHeader("Cache-Control", "no-store");
     res.status(200).json(allResults);

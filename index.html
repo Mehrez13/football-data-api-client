@@ -146,6 +146,14 @@
   <label>Championnat
     <select id="competition"><option value="">Tous</option></select>
   </label>
+  <label>Marche
+    <select id="marche">
+      <option value="">Tous</option>
+      <option value="1N2">1N2</option>
+      <option value="BTTS">BTTS (2 equipes marquent)</option>
+      <option value="Buts">Total buts (+/-)</option>
+    </select>
+  </label>
   <label>Probabilite min (%)
     <input type="number" id="minProb" value="0" min="0" max="100" step="5">
   </label>
@@ -176,6 +184,7 @@
         <th class="nosort"></th>
         <th data-key="date_heure">Date</th>
         <th data-key="affiche">Match</th>
+        <th data-key="marche">Marche</th>
         <th data-key="issue">Issue</th>
         <th data-key="probabilite_marche_pct">Probabilite</th>
         <th data-key="meilleure_cote">Cote</th>
@@ -194,6 +203,13 @@
     <span class="badge safe" style="margin-left:0;">SUR</span> = probabilite estimee &ge; 70% que cette issue se
     produise (trie par defaut du plus probable au moins probable). Coche des lignes pour construire un pari
     combine (plusieurs selections dans "Mon coupon" ci-dessus).
+  </p>
+  <p>
+    <strong>Marches BTTS et Total buts</strong> : en plus du 1N2, on recupere aussi "les 2 equipes marquent" et
+    "plus/moins de X buts" - mais uniquement pour les matchs ou une issue 1N2 depasse deja 75% de probabilite
+    (l'API facture ces marches match par match, contrairement au 1N2 recupere en un seul appel par
+    championnat : on limite donc leur recherche aux rencontres les plus deja-jouees d'avance pour ne pas
+    epuiser le quota gratuit).
   </p>
   <p>
     <strong>Probabilite</strong> : chance estimee que cette issue arrive, d'apres la moyenne des cotes de tous
@@ -245,7 +261,7 @@ function saveSlip() {
 }
 
 function rowKey(r) {
-  return [r.affiche, r.issue, r.bookmaker, r.date_heure].join("|");
+  return [r.affiche, r.marche || "1N2", r.issue, r.bookmaker, r.date_heure].join("|");
 }
 
 function fmtDate(iso) {
@@ -278,6 +294,7 @@ function currentFilters() {
   return {
     bookmaker: document.getElementById("bookmaker").value,
     competition: document.getElementById("competition").value,
+    marche: document.getElementById("marche").value,
     minProb: parseFloat(document.getElementById("minProb").value || "0"),
     bankroll: parseFloat(document.getElementById("bankroll").value || "0"),
   };
@@ -288,7 +305,8 @@ function render() {
   let rows = RAW.filter(r =>
     r.probabilite_marche_pct >= f.minProb &&
     (!f.bookmaker || r.bookmaker === f.bookmaker) &&
-    (!f.competition || r.competition === f.competition)
+    (!f.competition || r.competition === f.competition) &&
+    (!f.marche || (r.marche || "1N2") === f.marche)
   );
 
   rows.sort((a, b) => {
@@ -314,6 +332,7 @@ function render() {
       <td><input type="checkbox" class="pick" data-key="${key}" ${checked ? "checked" : ""}></td>
       <td class="muted">${fmtDate(r.date_heure)}</td>
       <td class="affiche">${r.affiche}<div class="muted">${r.competition}</div></td>
+      <td class="muted">${r.marche || "1N2"}</td>
       <td>${r.issue}</td>
       <td class="${isSafe ? 'prob-high' : ''}">${r.probabilite_marche_pct.toFixed(1)}%${isSafe ? '<span class="badge safe">SUR</span>' : ''}${r.arbitrage ? '<span class="badge arb">ARB</span>' : ''}</td>
       <td>${r.meilleure_cote.toFixed(2)}</td>
@@ -334,7 +353,7 @@ function togglePick(row, add) {
   SLIP = SLIP.filter(s => rowKey(s) !== key);
   if (add) {
     SLIP.push({
-      affiche: row.affiche, competition: row.competition, issue: row.issue,
+      affiche: row.affiche, competition: row.competition, marche: row.marche || "1N2", issue: row.issue,
       bookmaker: row.bookmaker, date_heure: row.date_heure,
       meilleure_cote: row.meilleure_cote, probabilite_marche_pct: row.probabilite_marche_pct,
     });
@@ -363,7 +382,7 @@ function renderSlip() {
 
   const rowsHtml = SLIP.map(s => `
     <div class="slip-row">
-      <div class="desc">${s.affiche} <span class="muted">- ${s.issue}</span><div class="muted">${s.competition} - ${s.bookmaker}</div></div>
+      <div class="desc">${s.affiche} <span class="muted">- ${s.marche || "1N2"} : ${s.issue}</span><div class="muted">${s.competition} - ${s.bookmaker}</div></div>
       <div class="cote">${s.meilleure_cote.toFixed(2)}</div>
       <button type="button" data-remove="${rowKey(s)}" title="Retirer">&times;</button>
     </div>
@@ -438,6 +457,7 @@ document.getElementById("sortDirBtn").addEventListener("click", () => {
 document.getElementById("resetBtn").addEventListener("click", () => {
   document.getElementById("bookmaker").value = DEFAULT_BOOKMAKER;
   document.getElementById("competition").value = "";
+  document.getElementById("marche").value = "";
   document.getElementById("minProb").value = "0";
   sortKey = "probabilite_marche_pct";
   sortDir = -1;
@@ -445,7 +465,7 @@ document.getElementById("resetBtn").addEventListener("click", () => {
   render();
 });
 
-["bankroll", "minProb", "bookmaker", "competition"].forEach(id => {
+["bankroll", "minProb", "bookmaker", "competition", "marche"].forEach(id => {
   document.getElementById(id).addEventListener("input", render);
 });
 
