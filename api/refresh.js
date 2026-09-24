@@ -22,17 +22,21 @@ const FRENCH_LICENSED_BOOKMAKERS = new Set(["Winamax (FR)", "Betclic (FR)", "Uni
 const KELLY_FRACTION = 0.25;
 const MAX_STAKE_PCT = 0.05;
 
-// Marches secondaires (BTTS, over/under buts) : l'API ne les fournit que via
+// Marche secondaire (over/under buts) : l'API ne le fournit que via
 // l'endpoint par match (1 credit par marche par match interroge), contre 1
 // credit par championnat entier pour le 1N2. Pour ne pas exploser le quota
-// gratuit, on ne va les chercher QUE pour les matchs ou une issue 1N2 a deja
+// gratuit, on ne va le chercher QUE pour les matchs ou une issue 1N2 a deja
 // une probabilite tres elevee (favori tres marque).
-const SECONDARY_MARKETS = "btts,totals,double_chance,draw_no_bet,spreads";
+// BTTS, double chance, remboursé-si-nul et handicap ont ete testes et
+// retires : au 2026-09, aucun des 4 bookmakers agrees FR (Winamax, Betclic,
+// Unibet FR, PMU FR) ne les propose via cette API - seul PMU (FR) expose le
+// marche "totals". A revoir si l'API ou PMU elargit sa couverture.
+const SECONDARY_MARKETS = "totals";
 const SECONDARY_MARKETS_PROB_THRESHOLD = 75;
 // Plafond de securite : les appels se font en sequence (rate-limit de l'API),
 // donc on borne le nombre de matchs interroges pour rester dans le temps
 // d'execution de la fonction serverless.
-const SECONDARY_MARKETS_MAX_EVENTS = 3;
+const SECONDARY_MARKETS_MAX_EVENTS = 15;
 
 async function fetchJson(url) {
   const res = await fetch(url);
@@ -135,14 +139,6 @@ function analyzeH2h(event) {
   return buildRows(event, "1N2", best, fairProb, (name) => (name === home ? "1" : name === away ? "2" : "N"));
 }
 
-function analyzeBtts(event) {
-  const bookmakers = (event.bookmakers || []).filter((b) => !EXCHANGES.has(b.title));
-  const fairProb = devigMarket(bookmakers, "btts", 2);
-  if (Object.keys(fairProb).length === 0) return [];
-  const best = bestOddsForMarket(bookmakers, "btts");
-  return buildRows(event, "BTTS", best, fairProb, (name) => (name === "Yes" ? "Les 2 equipes marquent" : "Pas les 2 equipes"));
-}
-
 function analyzeTotals(event) {
   const bookmakers = (event.bookmakers || []).filter((b) => !EXCHANGES.has(b.title));
   const fairProb = devigMarket(bookmakers, "totals", 2);
@@ -225,7 +221,7 @@ module.exports = async (req, res) => {
             .join(" | ");
           console.error(`DEBUG ${e._affiche} (${e.id}): ${summary || "aucun bookmaker retourne"}`);
         }
-        secondaryRows.push(...analyzeBtts(enriched), ...analyzeTotals(enriched));
+        secondaryRows.push(...analyzeTotals(enriched));
       } catch (err) {
         console.error(`Erreur marches secondaires sur ${e.id}: ${err.message}`);
       }

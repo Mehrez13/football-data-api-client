@@ -150,7 +150,6 @@
     <select id="marche">
       <option value="">Tous</option>
       <option value="1N2">1N2</option>
-      <option value="BTTS">BTTS (2 equipes marquent)</option>
       <option value="Buts">Total buts (+/-)</option>
     </select>
   </label>
@@ -205,11 +204,12 @@
     combine (plusieurs selections dans "Mon coupon" ci-dessus).
   </p>
   <p>
-    <strong>Marches BTTS et Total buts</strong> : en plus du 1N2, on recupere aussi "les 2 equipes marquent" et
-    "plus/moins de X buts" - mais uniquement pour les matchs ou une issue 1N2 depasse deja 75% de probabilite
-    (l'API facture ces marches match par match, contrairement au 1N2 recupere en un seul appel par
-    championnat : on limite donc leur recherche aux rencontres les plus deja-jouees d'avance pour ne pas
-    epuiser le quota gratuit).
+    <strong>Marche Total buts</strong> : en plus du 1N2, on recupere aussi "plus/moins de X buts" - mais
+    uniquement pour les matchs ou une issue 1N2 depasse deja 75% de probabilite (l'API facture ce marche
+    match par match, contrairement au 1N2 recupere en un seul appel par championnat : on limite donc sa
+    recherche aux rencontres les plus deja-jouees d'avance pour ne pas epuiser le quota gratuit). BTTS
+    (les 2 equipes marquent), double chance et handicap ont ete testes mais retires : aucun bookmaker
+    agree France ne les propose actuellement via cette API.
   </p>
   <p>
     <strong>Probabilite</strong> : chance estimee que cette issue arrive, d'apres la moyenne des cotes de tous
