@@ -27,12 +27,12 @@ const MAX_STAKE_PCT = 0.05;
 // credit par championnat entier pour le 1N2. Pour ne pas exploser le quota
 // gratuit, on ne va les chercher QUE pour les matchs ou une issue 1N2 a deja
 // une probabilite tres elevee (favori tres marque).
-const SECONDARY_MARKETS = "btts,totals";
+const SECONDARY_MARKETS = "btts,totals,double_chance,draw_no_bet,spreads";
 const SECONDARY_MARKETS_PROB_THRESHOLD = 75;
 // Plafond de securite : les appels se font en sequence (rate-limit de l'API),
 // donc on borne le nombre de matchs interroges pour rester dans le temps
 // d'execution de la fonction serverless.
-const SECONDARY_MARKETS_MAX_EVENTS = 15;
+const SECONDARY_MARKETS_MAX_EVENTS = 3;
 
 async function fetchJson(url) {
   const res = await fetch(url);
