@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aide a la decision - Paris Sport</title>
+<style>
+  :root {
+    --bg: #0f1420;
+    --panel: #161d2e;
+    --border: #26304a;
+    --text: #e6e9f0;
+    --muted: #8a93a8;
+    --green: #35c17e;
+    --red: #e8546b;
+    --amber: #e0b23c;
+    --accent: #5b8cff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 16px;
+  }
+  h1 { font-size: 1.4em; margin: 0 0 4px; }
+  .subtitle { color: var(--muted); font-size: 0.9em; margin-bottom: 16px; }
+  .disclaimer {
+    background: #2a1f14;
+    border: 1px solid #4a3620;
+    color: #f0c98a;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 0.85em;
+    margin-bottom: 16px;
+    line-height: 1.5;
+  }
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 16px;
+  }
+  .control { display: flex; flex-direction: column; gap: 4px; font-size: 0.8em; color: var(--muted); }
+  .control input, .control select {
+    background: #0c1120;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 8px;
+    border-radius: 6px;
+    font-size: 0.95em;
+    min-width: 140px;
+  }
+  .stats { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  .stat {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 16px;
+    min-width: 120px;
+  }
+  .stat .value { font-size: 1.3em; font-weight: 600; }
+  .stat .label { color: var(--muted); font-size: 0.75em; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85em; }
+  th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 500; cursor: pointer; user-select: none; position: sticky; top: 0; background: var(--bg); }
+  th.active { color: var(--accent); }
+  tbody tr:hover { background: rgba(91,140,255,0.06); }
+  .ev-pos { color: var(--green); font-weight: 600; }
+  .ev-neg { color: var(--muted); }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.72em;
+    font-weight: 600;
+  }
+  .badge.arb { background: rgba(224,178,60,0.15); color: var(--amber); border: 1px solid var(--amber); }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); }
+  .empty { padding: 30px; text-align: center; color: var(--muted); }
+  .affiche { font-weight: 500; }
+  .meta { color: var(--muted); font-size: 0.85em; }
+</style>
+</head>
+<body>
+
+<h1>Aide a la decision - Paris Sport (Football / Tennis)</h1>
+<div class="subtitle">Comparatif multi-bookmakers issu de The Odds API - genere par analyze.py</div>
+
+<div class="disclaimer">
+  <strong>Lire avant utilisation :</strong> ce tableau ne predit pas de resultat. La "probabilite de marche"
+  est une moyenne des cotes des bookmakers (marge retiree), pas une certitude. L'EV affichee suppose que ce
+  consensus est correct, ce qui n'est jamais garanti. Les mises suggerees utilisent un Kelly fractionnaire
+  (25%) plafonne a 5% de la bankroll par pari pour limiter le risque de ruine, mais aucune mise ne supprime
+  le risque de perte. Ne misez que de l'argent que vous pouvez perdre. Aide : 09 74 75 13 13 (joueurs-info-service.fr).
+</div>
+
+<div class="controls">
+  <div class="control">
+    <label for="bankroll">Bankroll (EUR)</label>
+    <input type="number" id="bankroll" value="100" min="0" step="10">
+  </div>
+  <div class="control">
+    <label for="sport">Sport</label>
+    <select id="sport"><option value="">Tous</option></select>
+  </div>
+  <div class="control">
+    <label for="competition">Competition</label>
+    <select id="competition"><option value="">Toutes</option></select>
+  </div>
+  <div class="control">
+    <label for="minEv">EV minimum (%)</label>
+    <input type="number" id="minEv" value="0" step="0.5">
+  </div>
+  <div class="control">
+    <label for="onlyArb">&nbsp;</label>
+    <label style="display:flex;align-items:center;gap:6px;color:var(--text);font-size:0.9em;">
+      <input type="checkbox" id="onlyArb" style="min-width:auto;width:16px;height:16px;"> Arbitrages uniquement
+    </label>
+  </div>
+</div>
+
+<div class="stats" id="stats"></div>
+
+<div class="table-wrap">
+  <table id="tbl">
+    <thead>
+      <tr>
+        <th data-key="date_heure">Date</th>
+        <th data-key="sport">Sport</th>
+        <th data-key="competition">Competition</th>
+        <th data-key="affiche">Match</th>
+        <th data-key="issue">Issue</th>
+        <th data-key="meilleure_cote">Cote</th>
+        <th data-key="bookmaker">Bookmaker</th>
+        <th data-key="probabilite_marche_pct">Prob. marche</th>
+        <th data-key="ev_pct">EV</th>
+        <th data-key="stake_fraction_pct">Mise suggeree</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  <div class="empty" id="empty" style="display:none;">Aucune donnee. Lance scraper.py puis analyze.py pour generer paris_data.json.</div>
+</div>
+
+<script>
+let RAW = [];
+let sortKey = "ev_pct";
+let sortDir = -1;
+
+function fmtDate(iso) {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (isNaN(d)) return iso;
+  return d.toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
+function populateFilters(data) {
+  const sports = [...new Set(data.map(r => r.sport))].sort();
+  const sportSel = document.getElementById("sport");
+  sports.forEach(s => sportSel.appendChild(new Option(s, s)));
+
+  function refreshCompetitions() {
+    const sport = sportSel.value;
+    const compSel = document.getElementById("competition");
+    compSel.innerHTML = '<option value="">Toutes</option>';
+    const comps = [...new Set(data.filter(r => !sport || r.sport === sport).map(r => r.competition))].sort();
+    comps.forEach(c => compSel.appendChild(new Option(c, c)));
+  }
+  sportSel.addEventListener("change", () => { refreshCompetitions(); render(); });
+  refreshCompetitions();
+}
+
+function currentFilters() {
+  return {
+    sport: document.getElementById("sport").value,
+    competition: document.getElementById("competition").value,
+    minEv: parseFloat(document.getElementById("minEv").value || "-999"),
+    onlyArb: document.getElementById("onlyArb").checked,
+    bankroll: parseFloat(document.getElementById("bankroll").value || "0"),
+  };
+}
+
+function render() {
+  const f = currentFilters();
+  let rows = RAW.filter(r =>
+    (!f.sport || r.sport === f.sport) &&
+    (!f.competition || r.competition === f.competition) &&
+    (r.ev_pct >= f.minEv) &&
+    (!f.onlyArb || r.arbitrage)
+  );
+
+  rows.sort((a, b) => {
+    const va = a[sortKey], vb = b[sortKey];
+    if (typeof va === "string") return sortDir * va.localeCompare(vb);
+    return sortDir * ((va ?? 0) - (vb ?? 0));
+  });
+
+  const tbody = document.getElementById("tbody");
+  tbody.innerHTML = "";
+  document.getElementById("empty").style.display = rows.length ? "none" : "block";
+
+  for (const r of rows.slice(0, 300)) {
+    const tr = document.createElement("tr");
+    const stakeAmount = (f.bankroll * r.stake_fraction_pct / 100).toFixed(2);
+    tr.innerHTML = `
+      <td class="meta">${fmtDate(r.date_heure)}</td>
+      <td>${r.sport}</td>
+      <td class="meta">${r.competition}</td>
+      <td class="affiche">${r.affiche}${r.arbitrage ? ' <span class="badge arb">ARBITRAGE</span>' : ''}</td>
+      <td>${r.issue}</td>
+      <td>${r.meilleure_cote.toFixed(2)}</td>
+      <td class="meta">${r.bookmaker}</td>
+      <td class="meta">${r.probabilite_marche_pct.toFixed(1)}%</td>
+      <td class="${r.ev_pct > 0 ? 'ev-pos' : 'ev-neg'}">${r.ev_pct > 0 ? '+' : ''}${r.ev_pct.toFixed(2)}%</td>
+      <td>${stakeAmount} EUR <span class="meta">(${r.stake_fraction_pct.toFixed(2)}%)</span></td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  renderStats(rows);
+}
+
+function renderStats(rows) {
+  const stats = document.getElementById("stats");
+  const positive = rows.filter(r => r.ev_pct > 0);
+  const arbs = rows.filter(r => r.arbitrage);
+  const avgEv = positive.length ? (positive.reduce((s, r) => s + r.ev_pct, 0) / positive.length).toFixed(2) : "0.00";
+  stats.innerHTML = `
+    <div class="stat"><div class="value">${rows.length}</div><div class="label">Lignes affichees</div></div>
+    <div class="stat"><div class="value">${positive.length}</div><div class="label">EV positive</div></div>
+    <div class="stat"><div class="value">${arbs.length}</div><div class="label">Arbitrages</div></div>
+    <div class="stat"><div class="value">${avgEv}%</div><div class="label">EV moyenne (positives)</div></div>
+  `;
+}
+
+document.querySelectorAll("th[data-key]").forEach(th => {
+  th.addEventListener("click", () => {
+    const key = th.dataset.key;
+    if (sortKey === key) { sortDir *= -1; } else { sortKey = key; sortDir = -1; }
+    document.querySelectorAll("th").forEach(t => t.classList.remove("active"));
+    th.classList.add("active");
+    render();
+  });
+});
+
+["bankroll", "sport", "competition", "minEv", "onlyArb"].forEach(id => {
+  document.getElementById(id).addEventListener("input", render);
+});
+
+fetch("paris_data.json")
+  .then(r => r.json())
+  .then(data => { RAW = data; populateFilters(data); render(); })
+  .catch(() => { document.getElementById("empty").style.display = "block"; });
+</script>
+</body>
+</html>

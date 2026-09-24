@@ -102,5 +102,6 @@ output/
 # Scraper FDJ - résultats générés
 cotes_fdj.json
 cotes_fdj.csv
+paris_data.json
 __pycache__/
 *.pyc
