@@ -47,6 +47,26 @@ SPORT_GROUPS = {
     "Tennis": "Tennis",
 }
 
+# Le groupe "Soccer" de The Odds API couvre le monde entier (Bresil, Coree,
+# Mexique, MLS...). Pour rester sur du football europeen (et economiser le
+# quota gratuit : chaque competition interrogee coute 1 credit), on limite
+# aux championnats/coupes europeens usuels.
+EUROPEAN_FOOTBALL_KEYS = {
+    "soccer_epl", "soccer_efl_champ", "soccer_england_league1", "soccer_england_league2",
+    "soccer_england_efl_cup", "soccer_fa_cup",
+    "soccer_france_ligue_one", "soccer_france_ligue_two", "soccer_france_coupe_de_france",
+    "soccer_germany_bundesliga", "soccer_germany_bundesliga2", "soccer_germany_liga3",
+    "soccer_germany_dfb_pokal",
+    "soccer_italy_serie_a", "soccer_italy_serie_b", "soccer_italy_coppa_italia",
+    "soccer_spain_la_liga", "soccer_spain_segunda_division", "soccer_spain_copa_del_rey",
+    "soccer_netherlands_eredivisie", "soccer_portugal_primeira_liga",
+    "soccer_belgium_first_div", "soccer_turkey_super_league", "soccer_greece_super_league",
+    "soccer_switzerland_superleague", "soccer_denmark_superliga", "soccer_norway_eliteserien",
+    "soccer_sweden_allsvenskan", "soccer_sweden_superettan", "soccer_finland_veikkausliiga",
+    "soccer_league_of_ireland", "soccer_spl", "soccer_austria_bundesliga",
+    "soccer_poland_ekstraklasa",
+}
+
 JSON_OUTPUT = Path("cotes_fdj.json")
 CSV_OUTPUT = Path("cotes_fdj.csv")
 
@@ -166,6 +186,13 @@ def scrape_all() -> list[Cote]:
 
         for sport_label, group_name in SPORT_GROUPS.items():
             competitions = [s for s in active_sports if s.get("group") == group_name and not s.get("has_outrights")]
+
+            if sport_label == "Football":
+                competitions = [
+                    s for s in competitions
+                    if s["key"] in EUROPEAN_FOOTBALL_KEYS or s["key"].startswith("soccer_uefa_")
+                ]
+
             logger.info("%s: %d competition(s) active(s) trouvee(s)", sport_label, len(competitions))
 
             for competition in competitions:
