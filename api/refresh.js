@@ -29,6 +29,10 @@ const MAX_STAKE_PCT = 0.05;
 // une probabilite tres elevee (favori tres marque).
 const SECONDARY_MARKETS = "btts,totals";
 const SECONDARY_MARKETS_PROB_THRESHOLD = 75;
+// Plafond de securite : les appels se font en sequence (rate-limit de l'API),
+// donc on borne le nombre de matchs interroges pour rester dans le temps
+// d'execution de la fonction serverless.
+const SECONDARY_MARKETS_MAX_EVENTS = 15;
 
 async function fetchJson(url) {
   const res = await fetch(url);
@@ -195,35 +199,38 @@ module.exports = async (req, res) => {
     // Etape 2 : marches secondaires (BTTS, buts) uniquement pour les matchs
     // ayant deja une issue 1N2 tres favorite (>= seuil), pour limiter le
     // nombre d'appels par match (chacun coute des credits en plus).
-    const flaggedEvents = allEvents.filter((e) =>
-      h2hRows.some(
-        (r) =>
-          r.affiche === e._affiche &&
-          r.date_heure === e.commence_time &&
-          r.probabilite_marche_pct >= SECONDARY_MARKETS_PROB_THRESHOLD
+    const flaggedEvents = allEvents
+      .filter((e) =>
+        h2hRows.some(
+          (r) =>
+            r.affiche === e._affiche &&
+            r.date_heure === e.commence_time &&
+            r.probabilite_marche_pct >= SECONDARY_MARKETS_PROB_THRESHOLD
+        )
       )
-    );
+      .slice(0, SECONDARY_MARKETS_MAX_EVENTS);
 
-    const secondaryTasks = flaggedEvents.map((e) => {
+    // Appels sequentiels (pas Promise.all) : l'endpoint par match est
+    // sensible au rate-limit de The Odds API (429 EXCEEDED_FREQ_LIMIT) des
+    // qu'on tire plusieurs requetes en parallele.
+    const secondaryRows = [];
+    for (const e of flaggedEvents) {
       const url = `${API_BASE}/sports/${e._sportKey}/events/${e.id}/odds?apiKey=${apiKey}&regions=${REGIONS}&markets=${SECONDARY_MARKETS}&oddsFormat=decimal&dateFormat=iso`;
-      return fetchJson(url)
-        .then((full) => {
-          const enriched = { ...full, _competitionTitle: e._competitionTitle, _affiche: e._affiche };
-          if (process.env.DEBUG_MARKETS) {
-            const summary = (full.bookmakers || [])
-              .map((b) => `${b.title}:[${(b.markets || []).map((m) => m.key).join(",")}]`)
-              .join(" | ");
-            console.error(`DEBUG ${e._affiche} (${e.id}): ${summary || "aucun bookmaker retourne"}`);
-          }
-          return [...analyzeBtts(enriched), ...analyzeTotals(enriched)];
-        })
-        .catch((err) => {
-          console.error(`Erreur marches secondaires sur ${e.id}: ${err.message}`);
-          return [];
-        });
-    });
-
-    const secondaryRows = (await Promise.all(secondaryTasks)).flat();
+      try {
+        const full = await fetchJson(url);
+        const enriched = { ...full, _competitionTitle: e._competitionTitle, _affiche: e._affiche };
+        if (process.env.DEBUG_MARKETS) {
+          const summary = (full.bookmakers || [])
+            .map((b) => `${b.title}:[${(b.markets || []).map((m) => m.key).join(",")}]`)
+            .join(" | ");
+          console.error(`DEBUG ${e._affiche} (${e.id}): ${summary || "aucun bookmaker retourne"}`);
+        }
+        secondaryRows.push(...analyzeBtts(enriched), ...analyzeTotals(enriched));
+      } catch (err) {
+        console.error(`Erreur marches secondaires sur ${e.id}: ${err.message}`);
+      }
+      await new Promise((r) => setTimeout(r, 300));
+    }
 
     const allResults = [...h2hRows, ...secondaryRows].sort(
       (a, b) => b.probabilite_marche_pct - a.probabilite_marche_pct
