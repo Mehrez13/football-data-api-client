@@ -2,7 +2,7 @@ const API_BASE = "https://api.the-odds-api.com/v4";
 const REGIONS = "eu";
 const MARKETS = "h2h";
 
-const SPORT_GROUPS = { Football: "Soccer", Tennis: "Tennis" };
+const SPORT_GROUPS = { Football: "Soccer" };
 
 // Liste volontairement restreinte aux championnats les plus couverts par les
 // bookmakers licencies FR, pour limiter le nombre de requetes (donc de credits
@@ -50,18 +50,17 @@ function kellyStake(bestOdds, fairProb) {
   return Math.max(0, edge / b);
 }
 
-function analyzeEvent(event, sport) {
+function analyzeEvent(event) {
   const home = event.home_team;
   const away = event.away_team;
   const affiche = home && away ? `${home} - ${away}` : event.id;
-  const expectedOutcomes = sport === "Tennis" ? 2 : 3;
 
   const bookmakers = (event.bookmakers || []).filter((b) => !EXCHANGES.has(b.title));
 
   const fairSums = {};
   const fairCounts = {};
   for (const bm of bookmakers) {
-    const devig = devigOutcomes(bm, expectedOutcomes);
+    const devig = devigOutcomes(bm, 3);
     if (!devig) continue;
     for (const [name, prob] of Object.entries(devig)) {
       fairSums[name] = (fairSums[name] || 0) + prob;
@@ -96,7 +95,6 @@ function analyzeEvent(event, sport) {
     const issue = name === home ? "1" : name === away ? "2" : "N";
 
     results.push({
-      sport,
       competition: event._competitionTitle,
       affiche,
       date_heure: event.commence_time,
@@ -130,33 +128,31 @@ module.exports = async (req, res) => {
     const now = Date.now();
 
     const tasks = [];
-    for (const [sportLabel, groupName] of Object.entries(SPORT_GROUPS)) {
-      let competitions = sports.filter((s) => s.group === groupName && !s.has_outrights);
-      if (sportLabel === "Football") {
-        competitions = competitions.filter(
-          (s) => EUROPEAN_FOOTBALL_KEYS.has(s.key) || s.key.startsWith("soccer_uefa_")
-        );
-      }
-      for (const comp of competitions) {
-        const url = `${API_BASE}/sports/${comp.key}/odds?apiKey=${apiKey}&regions=${REGIONS}&markets=${MARKETS}&oddsFormat=decimal&dateFormat=iso`;
-        tasks.push(
-          fetchJson(url)
-            .then((events) =>
-              events
-                .filter((e) => new Date(e.commence_time).getTime() > now)
-                .map((e) => ({ ...e, _competitionTitle: comp.title }))
-                .flatMap((e) => analyzeEvent(e, sportLabel))
-            )
-            .catch((err) => {
-              console.error(`Erreur sur ${comp.key}: ${err.message}`);
-              return [];
-            })
-        );
-      }
+    const competitions = sports.filter(
+      (s) =>
+        s.group === SPORT_GROUPS.Football &&
+        !s.has_outrights &&
+        (EUROPEAN_FOOTBALL_KEYS.has(s.key) || s.key.startsWith("soccer_uefa_"))
+    );
+    for (const comp of competitions) {
+      const url = `${API_BASE}/sports/${comp.key}/odds?apiKey=${apiKey}&regions=${REGIONS}&markets=${MARKETS}&oddsFormat=decimal&dateFormat=iso`;
+      tasks.push(
+        fetchJson(url)
+          .then((events) =>
+            events
+              .filter((e) => new Date(e.commence_time).getTime() > now)
+              .map((e) => ({ ...e, _competitionTitle: comp.title }))
+              .flatMap((e) => analyzeEvent(e))
+          )
+          .catch((err) => {
+            console.error(`Erreur sur ${comp.key}: ${err.message}`);
+            return [];
+          })
+      );
     }
 
     const chunks = await Promise.all(tasks);
-    const allResults = chunks.flat().sort((a, b) => b.ev_pct - a.ev_pct);
+    const allResults = chunks.flat().sort((a, b) => b.probabilite_marche_pct - a.probabilite_marche_pct);
 
     res.setHeader("Cache-Control", "no-store");
     res.status(200).json(allResults);

@@ -152,7 +152,7 @@ def analyze() -> list[dict]:
                 }
             )
 
-    results.sort(key=lambda r: r["ev_pct"], reverse=True)
+    results.sort(key=lambda r: r["probabilite_marche_pct"], reverse=True)
     return results
 
 

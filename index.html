@@ -48,13 +48,14 @@
     cursor: pointer;
   }
   button#refreshBtn:disabled { opacity: 0.6; cursor: default; }
-  .bar input, .bar select {
+  .bar input {
     background: #0c1120;
     border: 1px solid var(--border);
     color: var(--text);
     padding: 8px 10px;
     border-radius: 8px;
     font-size: 0.9em;
+    width: 100px;
   }
   .bar label { color: var(--muted); font-size: 0.78em; display: flex; flex-direction: column; gap: 3px; }
   #refreshStatus { font-size: 0.82em; color: var(--muted); }
@@ -70,9 +71,10 @@
   th { color: var(--muted); font-weight: 500; cursor: pointer; user-select: none; position: sticky; top: 0; background: var(--panel); }
   th.active { color: var(--accent); }
   tbody tr:hover { background: rgba(91,140,255,0.06); }
-  tr.top-pick { background: var(--green-bg); }
-  tr.top-pick:hover { background: rgba(53,193,126,0.22); }
-  .ev-pos { color: var(--green); font-weight: 600; }
+  tr.safe-pick { background: var(--green-bg); }
+  tr.safe-pick:hover { background: rgba(53,193,126,0.22); }
+  .prob-high { color: var(--green); font-weight: 600; }
+  .ev-pos { color: var(--green); }
   .ev-neg { color: var(--muted); }
   .badge {
     display: inline-block;
@@ -82,14 +84,16 @@
     font-weight: 700;
     margin-left: 6px;
   }
-  .badge.top { background: var(--green); color: #06170f; }
+  .badge.safe { background: var(--green); color: #06170f; }
   .badge.arb { background: var(--amber); color: #241b04; }
   .empty { padding: 30px; text-align: center; color: var(--muted); }
   .affiche { font-weight: 500; }
   .foot { color: var(--muted); font-size: 0.78em; margin-top: 14px; line-height: 1.5; }
+  .foot dt { color: var(--text); font-weight: 600; display: inline; }
+  .foot dd { display: inline; margin: 0; }
 
   @media (max-width: 640px) {
-    .bar input, .bar select { min-width: 0; width: 100%; }
+    .bar input { width: 100%; }
     table, th, td { font-size: 0.78em; }
   }
 </style>
@@ -97,7 +101,7 @@
 <body>
 
 <header>
-  <h1>Bonnes cotes - Football &amp; Tennis</h1>
+  <h1>Bonnes cotes - Football</h1>
   <span class="muted">The Odds API - bookmakers licencies FR</span>
 </header>
 
@@ -107,11 +111,8 @@
   <label>Bankroll (EUR)
     <input type="number" id="bankroll" value="100" min="0" step="10">
   </label>
-  <label>EV min (%)
-    <input type="number" id="minEv" value="0" step="0.5">
-  </label>
-  <label>Sport
-    <select id="sport"><option value="">Tous</option></select>
+  <label>Probabilite min (%)
+    <input type="number" id="minProb" value="0" min="0" max="100" step="5">
   </label>
 </div>
 
@@ -124,6 +125,7 @@
         <th data-key="date_heure">Date</th>
         <th data-key="affiche">Match</th>
         <th data-key="issue">Issue</th>
+        <th data-key="probabilite_marche_pct">Probabilite</th>
         <th data-key="meilleure_cote">Cote</th>
         <th data-key="bookmaker">Bookmaker</th>
         <th data-key="ev_pct">EV</th>
@@ -136,15 +138,28 @@
 </div>
 
 <div class="foot">
-  Les cotes vertes (<span class="badge top" style="margin-left:0;">TOP</span>) ont une EV &ge; 5% : consensus marche nettement depasse par la meilleure cote FR disponible.
-  Ceci reste une estimation statistique, pas une garantie de gain. Kelly fractionne (25%), plafonne a 5% de la bankroll.
-  Aide : 09 74 75 13 13 (joueurs-info-service.fr).
+  <p>
+    <span class="badge safe" style="margin-left:0;">SUR</span> = probabilite estimee &ge; 70% que cette issue se
+    produise (trie par defaut du plus probable au moins probable).
+  </p>
+  <p>
+    <strong>Probabilite</strong> : chance estimee que cette issue arrive, d'apres la moyenne des cotes de tous
+    les bookmakers (marge retiree). Plus elle est haute, plus le resultat est "attendu" - mais la cote sera
+    aussi plus faible.<br>
+    <strong>EV</strong> (esperance de gain) : indique si la meilleure cote FR disponible est plus genereuse que
+    cette probabilite ne le justifierait. Une EV positive n'est pas une garantie de gain, et un favori tres
+    probable peut avoir une EV proche de 0 ou negative si sa cote est deja "juste".
+  </p>
+  <p>
+    Ceci reste une estimation statistique, pas une prediction fiable. Kelly fractionne (25%), plafonne a 5% de
+    la bankroll. Aide : 09 74 75 13 13 (joueurs-info-service.fr).
+  </p>
 </div>
 
 <script>
-const TOP_EV_THRESHOLD = 5;
+const SAFE_PROB_THRESHOLD = 70;
 let RAW = [];
-let sortKey = "ev_pct";
+let sortKey = "probabilite_marche_pct";
 let sortDir = -1;
 
 function fmtDate(iso) {
@@ -154,26 +169,16 @@ function fmtDate(iso) {
   return d.toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
-function populateFilters(data) {
-  const sportSel = document.getElementById("sport");
-  const current = sportSel.value;
-  sportSel.innerHTML = '<option value="">Tous</option>';
-  const sports = [...new Set(data.map(r => r.sport))].sort();
-  sports.forEach(s => sportSel.appendChild(new Option(s, s)));
-  sportSel.value = current;
-}
-
 function currentFilters() {
   return {
-    sport: document.getElementById("sport").value,
-    minEv: parseFloat(document.getElementById("minEv").value || "-999"),
+    minProb: parseFloat(document.getElementById("minProb").value || "0"),
     bankroll: parseFloat(document.getElementById("bankroll").value || "0"),
   };
 }
 
 function render() {
   const f = currentFilters();
-  let rows = RAW.filter(r => (!f.sport || r.sport === f.sport) && (r.ev_pct >= f.minEv));
+  let rows = RAW.filter(r => r.probabilite_marche_pct >= f.minProb);
 
   rows.sort((a, b) => {
     const va = a[sortKey], vb = b[sortKey];
@@ -187,16 +192,17 @@ function render() {
 
   for (const r of rows.slice(0, 300)) {
     const tr = document.createElement("tr");
-    const isTop = r.ev_pct >= TOP_EV_THRESHOLD;
-    if (isTop) tr.classList.add("top-pick");
+    const isSafe = r.probabilite_marche_pct >= SAFE_PROB_THRESHOLD;
+    if (isSafe) tr.classList.add("safe-pick");
     const stakeAmount = (f.bankroll * r.stake_fraction_pct / 100).toFixed(2);
     tr.innerHTML = `
       <td class="muted">${fmtDate(r.date_heure)}</td>
       <td class="affiche">${r.affiche}<div class="muted">${r.competition}</div></td>
       <td>${r.issue}</td>
+      <td class="${isSafe ? 'prob-high' : ''}">${r.probabilite_marche_pct.toFixed(1)}%${isSafe ? '<span class="badge safe">SUR</span>' : ''}${r.arbitrage ? '<span class="badge arb">ARB</span>' : ''}</td>
       <td>${r.meilleure_cote.toFixed(2)}</td>
       <td class="muted">${r.bookmaker}</td>
-      <td class="${r.ev_pct > 0 ? 'ev-pos' : 'ev-neg'}">${r.ev_pct > 0 ? '+' : ''}${r.ev_pct.toFixed(2)}%${isTop ? '<span class="badge top">TOP</span>' : ''}${r.arbitrage ? '<span class="badge arb">ARB</span>' : ''}</td>
+      <td class="${r.ev_pct > 0 ? 'ev-pos' : 'ev-neg'}">${r.ev_pct > 0 ? '+' : ''}${r.ev_pct.toFixed(2)}%</td>
       <td>${stakeAmount} EUR</td>
     `;
     tbody.appendChild(tr);
@@ -207,12 +213,12 @@ function render() {
 
 function renderStats(rows) {
   const stats = document.getElementById("stats");
+  const safe = rows.filter(r => r.probabilite_marche_pct >= SAFE_PROB_THRESHOLD);
   const positive = rows.filter(r => r.ev_pct > 0);
-  const top = rows.filter(r => r.ev_pct >= TOP_EV_THRESHOLD);
   stats.innerHTML = `
     <div class="stat"><div class="value">${rows.length}</div><div class="label">Lignes</div></div>
+    <div class="stat"><div class="value">${safe.length}</div><div class="label">Cotes sures (&ge;${SAFE_PROB_THRESHOLD}%)</div></div>
     <div class="stat"><div class="value">${positive.length}</div><div class="label">EV positive</div></div>
-    <div class="stat"><div class="value">${top.length}</div><div class="label">Tres bonnes cotes (&ge;${TOP_EV_THRESHOLD}%)</div></div>
   `;
 }
 
@@ -226,14 +232,14 @@ document.querySelectorAll("th[data-key]").forEach(th => {
   });
 });
 
-["bankroll", "sport", "minEv"].forEach(id => {
+["bankroll", "minProb"].forEach(id => {
   document.getElementById(id).addEventListener("input", render);
 });
 
 function loadInitial() {
   fetch("paris_data.json")
     .then(r => { if (!r.ok) throw new Error("no snapshot"); return r.json(); })
-    .then(data => { RAW = data; populateFilters(data); render(); })
+    .then(data => { RAW = data; render(); })
     .catch(() => {
       document.getElementById("refreshStatus").textContent = "Pas de donnees enregistrees - clique sur Actualiser.";
     });
@@ -252,7 +258,6 @@ async function refreshData() {
     if (!res.ok) throw new Error(data.error || `Erreur ${res.status}`);
 
     RAW = data;
-    populateFilters(data);
     render();
     status.textContent = `Mis a jour ${new Date().toLocaleTimeString("fr-FR")} - ${data.length} ligne(s)`;
   } catch (err) {

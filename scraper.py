@@ -44,7 +44,6 @@ ODDS_FORMAT = "decimal"
 # Groupes The Odds API a couvrir (voir GET /v4/sports, champ "group").
 SPORT_GROUPS = {
     "Football": "Soccer",
-    "Tennis": "Tennis",
 }
 
 # Le groupe "Soccer" de The Odds API couvre le monde entier (Bresil, Coree,
