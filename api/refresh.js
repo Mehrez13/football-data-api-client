@@ -4,20 +4,16 @@ const MARKETS = "h2h";
 
 const SPORT_GROUPS = { Football: "Soccer", Tennis: "Tennis" };
 
+// Liste volontairement restreinte aux championnats les plus couverts par les
+// bookmakers licencies FR, pour limiter le nombre de requetes (donc de credits
+// The Odds API, 500/mois en offre gratuite) consommees a chaque actualisation.
 const EUROPEAN_FOOTBALL_KEYS = new Set([
-  "soccer_epl", "soccer_efl_champ", "soccer_england_league1", "soccer_england_league2",
-  "soccer_england_efl_cup", "soccer_fa_cup",
+  "soccer_epl", "soccer_fa_cup",
   "soccer_france_ligue_one", "soccer_france_ligue_two", "soccer_france_coupe_de_france",
-  "soccer_germany_bundesliga", "soccer_germany_bundesliga2", "soccer_germany_liga3",
-  "soccer_germany_dfb_pokal",
-  "soccer_italy_serie_a", "soccer_italy_serie_b", "soccer_italy_coppa_italia",
-  "soccer_spain_la_liga", "soccer_spain_segunda_division", "soccer_spain_copa_del_rey",
+  "soccer_germany_bundesliga",
+  "soccer_italy_serie_a",
+  "soccer_spain_la_liga",
   "soccer_netherlands_eredivisie", "soccer_portugal_primeira_liga",
-  "soccer_belgium_first_div", "soccer_turkey_super_league", "soccer_greece_super_league",
-  "soccer_switzerland_superleague", "soccer_denmark_superliga", "soccer_norway_eliteserien",
-  "soccer_sweden_allsvenskan", "soccer_sweden_superettan", "soccer_finland_veikkausliiga",
-  "soccer_league_of_ireland", "soccer_spl", "soccer_austria_bundesliga",
-  "soccer_poland_ekstraklasa",
 ]);
 
 const EXCHANGES = new Set(["Betfair", "Matchbook", "Smarkets"]);
