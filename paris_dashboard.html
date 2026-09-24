@@ -123,6 +123,16 @@
       <input type="checkbox" id="onlyArb" style="min-width:auto;width:16px;height:16px;"> Arbitrages uniquement
     </label>
   </div>
+  <div class="control">
+    <label>&nbsp;</label>
+    <button id="refreshBtn" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:0.9em;font-weight:600;cursor:pointer;">
+      Actualiser les cotes
+    </button>
+  </div>
+  <div class="control" style="justify-content:flex-end;">
+    <label>&nbsp;</label>
+    <span id="refreshStatus" class="meta" style="font-size:0.85em;"></span>
+  </div>
 </div>
 
 <div class="stats" id="stats"></div>
@@ -253,10 +263,41 @@ document.querySelectorAll("th[data-key]").forEach(th => {
   document.getElementById(id).addEventListener("input", render);
 });
 
-fetch("paris_data.json")
-  .then(r => r.json())
-  .then(data => { RAW = data; populateFilters(data); render(); })
-  .catch(() => { document.getElementById("empty").style.display = "block"; });
+function loadInitial() {
+  fetch("paris_data.json")
+    .then(r => r.json())
+    .then(data => { RAW = data; populateFilters(data); render(); })
+    .catch(() => { document.getElementById("empty").style.display = "block"; });
+}
+
+async function refreshData() {
+  const btn = document.getElementById("refreshBtn");
+  const status = document.getElementById("refreshStatus");
+  btn.disabled = true;
+  btn.textContent = "Actualisation...";
+  status.textContent = "Interrogation de The Odds API, ca peut prendre quelques secondes...";
+
+  try {
+    const res = await fetch("/api/refresh");
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `Erreur ${res.status}`);
+
+    RAW = data;
+    document.getElementById("sport").innerHTML = '<option value="">Tous</option>';
+    document.getElementById("competition").innerHTML = '<option value="">Toutes</option>';
+    populateFilters(data);
+    render();
+    status.textContent = `Mis a jour: ${new Date().toLocaleTimeString("fr-FR")} (${data.length} ligne(s))`;
+  } catch (err) {
+    status.textContent = `Echec de l'actualisation: ${err.message}`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Actualiser les cotes";
+  }
+}
+
+document.getElementById("refreshBtn").addEventListener("click", refreshData);
+loadInitial();
 </script>
 </body>
 </html>
