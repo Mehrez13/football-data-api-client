@@ -195,6 +195,11 @@
 
 <div class="foot">
   <p>
+    <strong>Aucune cote en cache</strong> : la page ne charge jamais de donnees anciennes au demarrage - il faut
+    cliquer sur "Actualiser les cotes" a chaque visite pour voir les prix du moment. C'est volontaire : mieux
+    vaut une page vide qu'une cote qui a bouge depuis.
+  </p>
+  <p>
     <strong>Cotes PMU (FR) uniquement</strong> : la cote et la mise affichees sont toujours celles de PMU
     (l'operateur utilise en bureau de tabac), jamais un autre bookmaker. Si PMU ne cote pas encore un match, il
     n'apparait simplement pas dans la liste (pas de repli automatique vers un autre operateur). La
@@ -459,13 +464,12 @@ document.getElementById("resetBtn").addEventListener("click", () => {
 syncSortControls();
 
 function loadInitial() {
-  fetch("paris_data.json")
-    .then(r => { if (!r.ok) throw new Error("no snapshot"); return r.json(); })
-    .then(data => { RAW = data; populateCompetitions(data); render(); })
-    .catch(() => {
-      document.getElementById("refreshStatus").textContent = "Pas de donnees enregistrees - clique sur Actualiser.";
-      renderSlip();
-    });
+  // Volontairement PAS de chargement d'un snapshot statique au demarrage :
+  // des cotes perimees affichees sans avertissement sont pires que pas de
+  // cotes du tout pour un outil qui sert a decider un pari reel. La page
+  // reste vide jusqu'au premier clic sur "Actualiser les cotes".
+  document.getElementById("refreshStatus").textContent = "Clique sur \"Actualiser les cotes\" pour charger les cotes du moment.";
+  renderSlip();
 }
 
 async function refreshData() {
