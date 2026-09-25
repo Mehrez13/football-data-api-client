@@ -15,7 +15,10 @@ Ceci reste une estimation statistique basee sur le consensus des
 bookmakers, pas une prediction fiable du resultat. Les paris sportifs
 comportent un risque de perte en capital.
 
-Genere paris_data.json, consomme par paris_dashboard.html.
+Genere paris_data.json pour analyse locale. Le dashboard web (index.html)
+ne charge plus ce fichier : il n'affiche que des cotes actualisees en
+direct via /api/refresh, pour ne jamais montrer de cote perimee sans
+avertissement.
 """
 
 from __future__ import annotations
@@ -152,7 +155,7 @@ def analyze() -> list[dict]:
                 }
             )
 
-    results.sort(key=lambda r: r["ev_pct"], reverse=True)
+    results.sort(key=lambda r: r["probabilite_marche_pct"], reverse=True)
     return results
 
 

@@ -104,3 +104,4 @@ cotes_fdj.json
 cotes_fdj.csv
 __pycache__/
 *.pyc
+paris_data.json
